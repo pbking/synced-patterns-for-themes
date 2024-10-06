@@ -21,7 +21,6 @@
  * Latest change wins.
  * 
  */
-
 class Synced_Patterns_For_Themes {
 
 	/**
@@ -48,7 +47,6 @@ class Synced_Patterns_For_Themes {
 
 		$pattern_files = glob(get_stylesheet_directory() . '/synced-patterns/*.php');
 
-
 		foreach ($pattern_files as $pattern_file) {
 
 			// get the contents of the file
@@ -56,11 +54,6 @@ class Synced_Patterns_For_Themes {
 			$file_modified_timestamp = filemtime($pattern_file);
 			$pattern_slug = '';
 			$pattern_title = '';
-
-			// get the whole first block of php code that includes the comment metadata (including the php tags)
-			if(preg_match('/(<\?php.*?\?>)/s', $pattern_content, $matches)) {
-				$pattern_meta = $matches[1];
-			}
 
 			// we can do this better... wordpress has a parser for this.  I just can't think of it right now.
 			if (preg_match('/\btitle\s*:\s*(.*)/i', $pattern_content, $matches)) {
@@ -84,25 +77,19 @@ class Synced_Patterns_For_Themes {
 					wp_update_post(array(
 						'ID' => $post_id,
 						'post_content' => $this->render_synced_pattern($pattern_file),
-						'post_modified' => $file_modified_timestamp,
 					));
 				} 
 
-				// if the post was updated after the file, update the file
-				else if ($file_modified_timestamp < $post_modified_timestamp) {
-					file_put_contents($pattern_file, $pattern_meta . "\n" . get_post_field('post_content', $post_id));
-				}
 			}
 
 			// create a new post
 			else {
-				wp_insert_post(array(
+				$post_id = wp_insert_post(array(
 					'post_title' => $pattern_title,
 					'post_content' => $this->render_synced_pattern($pattern_file),
 					'post_name' => $pattern_slug,
 					'post_status' => 'publish',
 					'comment_status' => 'closed',
-					'post_modified' => $file_modified_timestamp,
 					'ping_status' => 'closed',
 					'post_type' => 'wp_block',
 				));
