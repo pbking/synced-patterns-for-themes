@@ -1,0 +1,17 @@
+{
+	"core": "WordPress/WordPress",
+	"port": 8978,
+	"testsPort": 8979,
+	"plugins": ["."],
+	"themes": [
+		"WordPress/twentytwentyfive"
+	],
+        "mappings": { 
+            "wp-content/themes": "./themes" 
+        },
+	"config": {
+		"WP_UPLOAD_MAX_FILESIZE": "128M",
+		"WP_MEMORY_LIMIT": "256M"
+	}
+}
+
