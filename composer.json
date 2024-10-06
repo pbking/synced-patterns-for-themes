@@ -1,0 +1,19 @@
+{
+    "name": "pbking/synced-patterns-for-themes",
+    "require": {
+        "phpunit/phpunit": "^9.3",
+        "wp-phpunit/wp-phpunit": "^6.6",
+        "yoast/phpunit-polyfills": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Pbking\\SyncedPatternsForThemes\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Jason Crist",
+            "email": "jcrist@pbking.com"
+        }
+    ]
+}
