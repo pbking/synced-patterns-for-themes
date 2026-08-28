@@ -5,6 +5,8 @@
  * @package SyncedPatternsForThemes
  */
 
+use TwentyBellows\SyncedPatternsForThemes\Synced_Patterns;
+
 /**
  * The markup the block editor is served.
  *
@@ -134,6 +136,44 @@ class Test_Editor_Support extends Pattern_Test_Case {
 		remove_filter( 'synced_patterns_for_themes_is_editor_request', '__return_true' );
 
 		$this->assertStringContainsString( 'In a list', $filtered[0]->content );
+	}
+
+	/**
+	 * A synced pattern is offered to the inserter as a reference to itself.
+	 */
+	public function test_synced_pattern_is_offered_as_a_reference() {
+		$this->register_pattern( 'test/hero', $this->bound_heading(), array( 'title' => 'Hero' ) );
+
+		$mark_synced = static function ( $slugs ) {
+			$slugs[] = 'test/hero';
+
+			return $slugs;
+		};
+
+		add_filter( 'synced_patterns_for_themes_synced_patterns', $mark_synced );
+		Synced_Patterns::flush();
+		Synced_Patterns::register_inserter_patterns();
+
+		$patterns  = $this->request_patterns();
+		$companion = $this->find_pattern( $patterns, Synced_Patterns::get_inserter_slug( 'test/hero' ) );
+		$design    = $this->find_pattern( $patterns, 'test/hero' );
+
+		remove_filter( 'synced_patterns_for_themes_synced_patterns', $mark_synced );
+
+		$this->assertNotNull( $companion, 'The inserter should be offered a reference.' );
+		$this->assertSame(
+			Synced_Patterns::get_reference_markup( 'test/hero' ),
+			$companion['content'],
+			'Inserting it should link the pattern rather than copy it.'
+		);
+
+		/*
+		 * The pattern itself still carries its blocks and their bindings, which
+		 * is what the editor renders the instance from.
+		 */
+		$this->assertNotNull( $design );
+		$this->assertStringContainsString( 'core/pattern-overrides', $design['content'] );
+		$this->assertStringContainsString( 'Default headline', $design['content'] );
 	}
 
 	/**

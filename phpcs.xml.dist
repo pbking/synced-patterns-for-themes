@@ -46,6 +46,11 @@
 		<exclude-pattern>/bootstrap\.php$</exclude-pattern>
 	</rule>
 
+	<!-- Test fixtures write their own files, as the WordPress test suite does. -->
+	<rule ref="WordPress.WP.AlternativeFunctions">
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+
 	<!-- The PHPUnit bootstrap runs on the command line, before WordPress loads. -->
 	<rule ref="WordPress.Security.EscapeOutput">
 		<exclude-pattern>/bootstrap\.php$</exclude-pattern>

@@ -1,10 +1,10 @@
 === Synced Patterns for Themes ===
 Contributors:      twentybellows, pbking
-Tags:              patterns, block patterns, block bindings, themes, block editor
+Tags:              patterns, block patterns, synced patterns, block bindings, themes
 Requires at least: 6.8
 Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        2.0.0
+Stable tag:        2.1.0
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,33 @@ name, then by attribute name:
 Any slot you leave out keeps the design pattern's own content, so a pattern's
 defaults double as its documentation.
 
+= Keeping a pattern linked =
+
+By default a pattern is a starting point: insert it and you get ordinary blocks
+you are free to change. Add `Synced: yes` to a pattern's header and it behaves
+like a synced pattern instead:
+
+`
+<?php
+/**
+ * Title: Notice
+ * Slug: mytheme/notice
+ * Synced: yes
+ */
+?>
+`
+
+Inserting it stores a reference rather than a copy. The design is rendered from
+the theme file and cannot be edited on the page — only the content slots can.
+Edit the file and every notice on the site changes with it, keeping whatever
+content each one was given.
+
+The block toolbar offers **Reset**, which puts the pattern's own content back,
+and **Detach**, which breaks the link and leaves ordinary editable blocks.
+
+Unlike version 1, nothing is copied into the database to make this work: the
+theme file stays the only source of truth.
+
 = Where it works =
 
 Patterns, templates, template parts, post content, and patterns inside other
@@ -91,10 +118,23 @@ No settings, no admin screen. Nothing is written to the database.
 
 = Do I need to mark my patterns as synced? =
 
-No. Version 1 of this plugin copied theme patterns into the database as synced
-patterns, because a synced pattern was the only kind that would accept content.
-Version 2 does not: `Synced: true` in a pattern header now does nothing, and
-patterns are read from theme files as WordPress reads them normally.
+Only if you want them to stay linked when someone inserts them. Filling a
+pattern's content from block markup needs no header at all.
+
+`Synced: yes` means what it says now — the pattern is inserted as a reference to
+the theme file, and edits to that file reach every use. Version 1 used the same
+header to copy the pattern into the database as a `wp_block`; version 2 keeps
+the file as the only source of truth.
+
+= Can a plugin's patterns be synced? =
+
+Yes. A plugin's patterns have no file header to read, so they opt in through a
+filter:
+
+`add_filter( 'synced_patterns_for_themes_synced_patterns', function ( $slugs ) {
+	$slugs[] = 'myplugin/notice';
+	return $slugs;
+} );`
 
 = What happens to the posts version 1 created? =
 
@@ -125,13 +165,22 @@ design pattern's own content.
 
 == Changelog ==
 
+= 2.1.0 =
+* `Synced: yes` in a pattern header keeps the pattern linked when it is
+  inserted, rendered live from the theme file with only its content slots
+  editable — without copying anything into the database.
+* Added **Reset** and **Detach** to a synced pattern's toolbar.
+* Added the `synced_patterns_for_themes_synced_patterns` filter, so patterns
+  registered by a plugin can be synced too.
+
 = 2.0.0 =
 * Rewritten around a single idea: `core/pattern` accepts a `content` attribute,
   the same way `core/block` already does.
 * Removed the `pb_block` custom post type, its capabilities, and the database
   writes that kept it in sync on every request.
 * Removed the REST API filters that made those posts look like synced patterns.
-* `Synced: true` in a pattern header no longer does anything.
+* `Synced: true` in a pattern header no longer copies the pattern into the
+  database. As of 2.1.0 it keeps the pattern linked instead.
 * Patterns now come from wherever WordPress registers them — parent themes,
   child themes, `.php` and `.html` files, and plugins — instead of a glob over
   the active theme's `patterns/*.php`.
@@ -145,8 +194,11 @@ design pattern's own content.
 
 == Upgrade Notice ==
 
+= 2.1.0 =
+`Synced: yes` keeps a pattern linked when it is inserted, without copying it
+into the database.
+
 = 2.0.0 =
-A rewrite. Theme patterns are no longer copied into the database, and
-`Synced: true` no longer does anything. Patterns now take their content from a
-`content` attribute on the pattern block. See the changelog before upgrading a
-live site.
+A rewrite. Theme patterns are no longer copied into the database. Patterns now
+take their content from a `content` attribute on the pattern block. See the
+changelog before upgrading a live site.

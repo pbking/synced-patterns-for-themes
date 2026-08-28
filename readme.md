@@ -80,6 +80,43 @@ bind the attributes it fills. This is core's Pattern Overrides syntax, unchanged
 keeps the design pattern's own content, which makes a pattern's defaults double
 as its documentation.
 
+### 3. Keep it linked, if you want to
+
+By default a pattern is a starting point: insert it and you get ordinary blocks
+you are free to change. Add `Synced: yes` to its header and it behaves like a
+synced pattern instead.
+
+```php
+<?php
+/**
+ * Title: Notice
+ * Slug: mytheme/notice
+ * Synced: yes
+ */
+?>
+<!-- wp:paragraph {"metadata":{"name":"message","bindings":{"content":{"source":"core/pattern-overrides"}}}} -->
+<p>Edit this file and every notice on the site changes with it.</p>
+<!-- /wp:paragraph -->
+```
+
+Inserting it stores a reference, not a copy. The design comes from the theme file
+and cannot be edited on the page; only the slots can. Change the file and every
+use changes, each keeping the content it was given. **Reset** puts the pattern's
+own content back; **Detach** breaks the link and leaves ordinary blocks.
+
+Nothing is copied into the database to make this work — unlike version 1, the
+theme file stays the only source of truth.
+
+Patterns registered by a plugin have no header to read, so they opt in through a
+filter:
+
+```php
+add_filter( 'synced_patterns_for_themes_synced_patterns', function ( $slugs ) {
+	$slugs[] = 'myplugin/notice';
+	return $slugs;
+} );
+```
+
 ### Where it works
 
 Patterns, templates, template parts, post content, and patterns inside other
@@ -116,9 +153,26 @@ each pattern block with content becomes the blocks it stands for, the values are
 written into their markup, and the bindings that asked for them are removed. What
 the editor loads is plain, editable content.
 
-**In the browser**, two small filters cover a pattern block that reaches the
-canvas directly: one declares the `content` attribute so it survives a
-parse/serialize round trip, the other expands the block with its content applied.
+**In the browser**, a filter declares the `content` attribute so it survives a
+parse/serialize round trip, and a second one decides what a pattern block on the
+canvas becomes: a synced pattern renders as a live instance, anything else
+expands into ordinary blocks.
+
+**A synced instance** is rendered the way core renders a synced pattern, in
+`src/synced-pattern-edit.js`: the pattern's blocks go to `useInnerBlocksProps` as
+a controlled value whose handlers discard changes, which is what locks the
+design, while the slots stay editable through the bindings machinery. The
+inserter is offered a companion pattern whose content is a single reference
+block, because a pattern cannot otherwise offer a reference to itself.
+
+One thing to know about: core's `core/pattern-overrides` binding source reads
+generically from block context, but writes only to a `core/block` ancestor —
+with a `core/pattern` host it falls back to updating every block of the same
+name in the document. `src/pattern-overrides-source.js` re-registers the source
+with a `setValues` that recognises a pattern host and hands every other case
+back to core's original. That is the one place this shadows a core
+implementation, and the first place to look if a WordPress update breaks slot
+editing.
 
 Nothing is written to the database, and no post type, capability or REST route is
 added.
@@ -134,8 +188,9 @@ Version 1 reached the same goal by copying theme patterns into the database as
 synced patterns (`pb_block` posts) and making the REST API present them as
 reusable blocks. None of that is left.
 
-* `Synced: true` in a pattern header no longer does anything. Those patterns keep
-  working as ordinary theme patterns.
+* `Synced: true` in a pattern header no longer copies the pattern into the
+  database. It now keeps the pattern linked to its file instead — the same idea,
+  without the shadow copy.
 * The `pb_block` posts version 1 created are no longer used, and are safe to
   delete.
 * Patterns now come from wherever WordPress registers them — parent themes, child
@@ -150,6 +205,7 @@ composer install     # test and linting dependencies
 
 npm run build        # build build/index.js
 npm run lint:js      # lint the editor script
+npm run test:unit    # run the editor script's unit tests
 composer run lint    # lint the PHP
 
 npm run start        # start WordPress at http://localhost:8978 (needs Docker)
@@ -158,7 +214,8 @@ npm run test         # run the PHP tests against that environment
 
 `dev-assets/themes/synced-patterns-test` is a small block theme that uses the
 feature; `npm run start` mounts it, so it can be activated from Appearance →
-Themes.
+Themes. Its Hero and Card patterns are filled in from markup; its Notice pattern
+is synced.
 
 ## License
 

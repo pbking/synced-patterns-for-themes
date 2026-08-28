@@ -1,6 +1,6 @@
 {
   "name": "synced-patterns-for-themes",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Lets block markup supply the content for a pattern.",
   "author": "Twenty Bellows",
   "license": "GPL-2.0-or-later",
@@ -17,16 +17,19 @@
     "plugin-zip": "wp-scripts plugin-zip",
     "plugin-test-env": "wp-now start --blueprint=plugin-test-blueprint.json --path=./release/synced-patterns-for-themes",
     "plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./synced-patterns-for-themes.zip -d ./release",
-    "plugin-test": "npm run plugin-zip && npm run plugin-unpack && npm run plugin-test-env"
+    "plugin-test": "npm run plugin-zip && npm run plugin-unpack && npm run plugin-test-env",
+    "test:unit": "wp-scripts test-unit-js"
   },
   "devDependencies": {
     "@wordpress/block-editor": "^14.20.0",
     "@wordpress/blocks": "^14.14.0",
+    "@wordpress/components": "^29.10.0",
     "@wordpress/compose": "^7.25.0",
     "@wordpress/data": "^10.25.0",
     "@wordpress/element": "^6.25.0",
     "@wordpress/env": "^10.9.0",
     "@wordpress/hooks": "^4.25.0",
+    "@wordpress/i18n": "^5.25.0",
     "@wordpress/scripts": "^30.15.0",
     "@wp-now/wp-now": "^0.1.74"
   }

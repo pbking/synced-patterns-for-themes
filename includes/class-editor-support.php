@@ -92,6 +92,19 @@ class Editor_Support {
 				continue;
 			}
 
+			$source_slug = Synced_Patterns::get_source_slug( $pattern['name'] );
+
+			/*
+			 * Core has just flattened this companion pattern into the blocks it
+			 * points at. Put the reference back: inserting it should link the
+			 * pattern, not copy it.
+			 */
+			if ( null !== $source_slug ) {
+				$patterns[ $index ]['content'] = Synced_Patterns::get_reference_markup( $source_slug );
+				$changed                       = true;
+				continue;
+			}
+
 			$registered = $registry->get_registered( $pattern['name'] );
 			$markup     = $registered['content'] ?? '';
 			$resolved   = Pattern_Resolver::resolve( $markup );
@@ -141,7 +154,7 @@ class Editor_Support {
 	 * @return WP_Block_Template|mixed The template.
 	 */
 	public function resolve_template( $template ) {
-		if ( ! $template instanceof WP_Block_Template || ! $this->is_editor_request() ) {
+		if ( ! $template instanceof WP_Block_Template || ! self::is_editor_request() ) {
 			return $template;
 		}
 
@@ -155,7 +168,7 @@ class Editor_Support {
 	 *
 	 * @return bool Whether template content should be composed for this request.
 	 */
-	private function is_editor_request(): bool {
+	public static function is_editor_request(): bool {
 		/**
 		 * Filters whether template content is composed for the current request.
 		 *
@@ -193,6 +206,15 @@ class Editor_Support {
 			$asset['dependencies'],
 			$asset['version'],
 			array( 'in_footer' => true )
+		);
+
+		wp_add_inline_script(
+			'synced-patterns-for-themes',
+			sprintf(
+				'window.syncedPatternsForThemes = %s;',
+				wp_json_encode( array( 'syncedPatterns' => Synced_Patterns::get_slugs() ) )
+			),
+			'before'
 		);
 	}
 }

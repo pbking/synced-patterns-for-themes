@@ -163,6 +163,39 @@ directly (hand-written post content, a template being edited):
 * `editor.BlockEdit` — when `core/pattern` has `content`, expand it into the
   pattern's blocks with the overrides applied, mirroring the PHP resolver.
 
+### 5. Keeping a pattern linked
+
+Filling a pattern's content is one half of the goal; the other is that a pattern
+a user drops into a page stays a pattern. `Synced: yes` in a pattern's header
+opts into that, and `Synced_Patterns` reads it.
+
+Core will not carry an unknown header through — `WP_Theme::get_block_patterns()`
+reads a fixed list — so the files are read again, 8 KB at a time, cached per
+theme, and only ever from the editor: the front end renders a pattern reference
+the same way whether or not it was inserted as one, so it never needs to ask.
+
+The inserter hands over a pattern's blocks, so a pattern cannot offer a reference
+to itself. A companion pattern can: it carries the title and categories, its
+content is one pattern block pointing at the real pattern, and the real pattern
+steps out of the inserter in its place. `Editor_Support` puts that reference back
+after core flattens it, the same hook that composes pattern content.
+
+In the editor, `SyncedPatternEdit` renders the instance the way core's
+`ReusableBlockEdit` renders a synced pattern: the pattern's blocks are handed to
+`useInnerBlocksProps` as a controlled value with handlers that discard changes,
+which locks the design, while the slots stay editable through the bindings
+machinery.
+
+Writing an edit back is the one place this shadows core. The
+`core/pattern-overrides` source reads generically from block context — which
+`core/pattern` now provides — but `setValues` looks only for a `core/block`
+ancestor, and with none falls back to updating every block of the same name in
+the document. That is right when editing a pattern's own source and wrong inside
+an instance, where it would leak between two instances of the same pattern on one
+page. The source is re-registered with a `setValues` that recognises a pattern
+host and hands every other case back to core's original, so it becomes a no-op if
+core ever stores values on a pattern block itself.
+
 ## What is removed
 
 * The `pb_block` post type, its twelve capabilities, and its 60-line copy of

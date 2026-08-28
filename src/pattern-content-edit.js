@@ -21,6 +21,8 @@ import { useEffect } from '@wordpress/element';
 import { addFilter } from '@wordpress/hooks';
 
 import { applyContent } from './apply-content';
+import { isSyncedPattern } from './synced-patterns';
+import { SyncedPatternEditWithRecursionCheck } from './synced-pattern-edit';
 
 /**
  * Replaces a pattern block with the pattern's blocks, content written in.
@@ -105,12 +107,16 @@ export const withPatternContent = createHigherOrderComponent(
 	( BlockEdit ) => ( props ) => {
 		const { name, attributes } = props;
 
-		if (
-			name === 'core/pattern' &&
-			attributes?.slug &&
-			attributes?.content
-		) {
-			return <PatternContentEdit { ...props } />;
+		if ( name === 'core/pattern' && attributes?.slug ) {
+			// A synced pattern stays linked, the way a synced pattern should.
+			if ( isSyncedPattern( attributes.slug ) ) {
+				return <SyncedPatternEditWithRecursionCheck { ...props } />;
+			}
+
+			// Any other pattern is a starting point: expand it, content and all.
+			if ( attributes.content ) {
+				return <PatternContentEdit { ...props } />;
+			}
 		}
 
 		return <BlockEdit { ...props } />;
