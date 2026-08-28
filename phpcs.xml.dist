@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<ruleset name="Synced Patterns for Themes">
+	<description>Coding standards for the Synced Patterns for Themes plugin.</description>
+
+	<file>.</file>
+
+	<exclude-pattern>/build/*</exclude-pattern>
+	<exclude-pattern>/dev-assets/*</exclude-pattern>
+	<exclude-pattern>/node_modules/*</exclude-pattern>
+	<exclude-pattern>/vendor/*</exclude-pattern>
+
+	<arg name="basepath" value="."/>
+	<arg name="colors"/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="8"/>
+	<arg value="ps"/>
+
+	<config name="minimum_wp_version" value="6.8"/>
+	<config name="testVersion" value="7.4-"/>
+
+	<rule ref="WordPress">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="synced_patterns_for_themes"/>
+				<element value="TwentyBellows\SyncedPatternsForThemes"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="synced-patterns-for-themes"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- Test classes follow the WordPress test suite's naming, not the plugin's. -->
+	<rule ref="WordPress.Files.FileName">
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<exclude-pattern>/tests/*</exclude-pattern>
+		<exclude-pattern>/bootstrap\.php$</exclude-pattern>
+	</rule>
+
+	<!-- Test fixtures write their own files, as the WordPress test suite does. -->
+	<rule ref="WordPress.WP.AlternativeFunctions">
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+
+	<!-- The PHPUnit bootstrap runs on the command line, before WordPress loads. -->
+	<rule ref="WordPress.Security.EscapeOutput">
+		<exclude-pattern>/bootstrap\.php$</exclude-pattern>
+	</rule>
+</ruleset>
