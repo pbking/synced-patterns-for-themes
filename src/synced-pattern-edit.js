@@ -12,7 +12,9 @@
  * bindings machinery reads and writes through it.
  */
 
+import { cloneBlock } from '@wordpress/blocks';
 import {
+	BlockControls,
 	RecursionProvider,
 	useBlockProps,
 	useHasRecursion,
@@ -20,9 +22,12 @@ import {
 	Warning,
 	store as blockEditorStore,
 } from '@wordpress/block-editor';
+import { ToolbarButton, ToolbarGroup } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { useEffect } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
+
+import { applyContent } from './apply-content';
 
 const NOOP = () => {};
 const EMPTY_ARRAY = [];
@@ -88,21 +93,64 @@ function useLockedDesign( clientId ) {
 }
 
 /**
+ * Removes the pattern metadata the inserter stamps on an instance.
+ *
+ * `parsePattern()` marks a single-block pattern with the pattern it came from:
+ *
+ *     metadata: { categories, patternName: pattern.name, name: pattern.title }
+ *
+ * Here `patternName` names the companion entry, not the pattern, so it is wrong
+ * on its face. It also puts the companion's slug in the saved markup, where the
+ * `--` has to be escaped to `\u002d\u002d`, and it makes the editor offer its
+ * own Detach, which only strips the metadata again and leaves the instance
+ * looking untouched. The block's name is kept: it is what the list view shows.
+ *
+ * @param {Object}   options               Options.
+ * @param {Object}   options.metadata      The block's metadata attribute.
+ * @param {Function} options.setAttributes Attribute setter.
+ * @param {Function} options.markQuiet     Marks the change as not persistent.
+ * @return {void}
+ */
+function useCleanPatternMetadata( { metadata, setAttributes, markQuiet } ) {
+	useEffect( () => {
+		if ( ! metadata?.patternName ) {
+			return;
+		}
+
+		const { patternName, ...rest } = metadata;
+
+		markQuiet();
+		setAttributes( {
+			metadata: Object.keys( rest ).length ? rest : undefined,
+		} );
+	}, [ metadata, setAttributes, markQuiet ] );
+}
+
+/**
  * Renders one instance of a synced pattern.
  *
- * @param {Object} props            Block props.
- * @param {Object} props.attributes Block attributes.
- * @param {string} props.clientId   Block client ID.
+ * @param {Object}   props               Block props.
+ * @param {Object}   props.attributes    Block attributes.
+ * @param {string}   props.clientId      Block client ID.
+ * @param {Function} props.setAttributes Attribute setter.
  * @return {JSX.Element} The instance.
  */
-export function SyncedPatternEdit( { attributes, clientId } ) {
-	const { slug } = attributes;
+export function SyncedPatternEdit( { attributes, clientId, setAttributes } ) {
+	const { slug, content, metadata } = attributes;
 
 	const pattern = useSelect(
 		( select ) =>
 			select( blockEditorStore ).__experimentalGetParsedPattern( slug ),
 		[ slug ]
 	);
+
+	const {
+		replaceBlocks,
+		__unstableMarkNextChangeAsNotPersistent: markQuiet,
+		__unstableMarkLastChangeAsPersistent: markPersistent,
+	} = useDispatch( blockEditorStore );
+
+	useCleanPatternMetadata( { metadata, setAttributes, markQuiet } );
 
 	const blockProps = useBlockProps();
 	const innerBlocksProps = useInnerBlocksProps( blockProps, {
@@ -130,7 +178,64 @@ export function SyncedPatternEdit( { attributes, clientId } ) {
 		);
 	}
 
-	return <div { ...innerBlocksProps } />;
+	/**
+	 * Puts the pattern's own content back.
+	 */
+	const resetContent = () => {
+		markPersistent();
+		setAttributes( { content: undefined } );
+	};
+
+	/**
+	 * Breaks the link, leaving ordinary editable blocks behind.
+	 *
+	 * The pattern's own blocks arrive stamped with `metadata.patternName`, which
+	 * would leave them locked to content-only editing. Detaching promises fully
+	 * editable blocks, so that stamp comes off.
+	 */
+	const detach = () => {
+		const detached = applyContent( pattern.blocks, content ).map(
+			( block ) => {
+				const { patternName, ...rest } =
+					block.attributes?.metadata ?? {};
+
+				return cloneBlock(
+					patternName
+						? {
+								...block,
+								attributes: {
+									...block.attributes,
+									metadata: Object.keys( rest ).length
+										? rest
+										: undefined,
+								},
+						  }
+						: block
+				);
+			}
+		);
+
+		replaceBlocks( clientId, detached );
+	};
+
+	return (
+		<>
+			<BlockControls group="other">
+				<ToolbarGroup>
+					<ToolbarButton
+						onClick={ resetContent }
+						disabled={ ! content }
+					>
+						{ __( 'Reset', 'synced-patterns-for-themes' ) }
+					</ToolbarButton>
+					<ToolbarButton onClick={ detach }>
+						{ __( 'Detach', 'synced-patterns-for-themes' ) }
+					</ToolbarButton>
+				</ToolbarGroup>
+			</BlockControls>
+			<div { ...innerBlocksProps } />
+		</>
+	);
 }
 
 /**

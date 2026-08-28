@@ -101,7 +101,9 @@ synced pattern instead.
 
 Inserting it stores a reference, not a copy. The design comes from the theme file
 and cannot be edited on the page; only the slots can. Change the file and every
-use changes, each keeping the content it was given.
+use changes, each keeping the content it was given. The block toolbar offers
+**Reset**, which restores the pattern's own content, and **Detach**, which breaks
+the link and leaves ordinary editable blocks with the instance's content in them.
 
 Nothing is copied into the database to make this work — unlike version 1, the
 theme file stays the only source of truth.
@@ -122,8 +124,10 @@ That rule is WordPress's, not this plugin's — `RichText` disables a bound fiel
 whenever it is inside a `pattern/overrides` context without a `__default`
 binding.
 
-There is no Detach control yet: WordPress renders no block toolbar for a pattern
-block, so there is nowhere to put one.
+One thing WordPress gets wrong about these: the Patterns screen labels them
+"Not synced". It decides that by pattern type — anything that is not a user
+pattern is reported as unsynced — and offers no filter to change it. The lock
+beside the label is correct; the wording is not.
 
 Patterns registered by a plugin have no header to read, so they opt in through a
 filter:

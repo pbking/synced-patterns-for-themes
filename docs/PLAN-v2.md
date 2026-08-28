@@ -225,11 +225,26 @@ const shouldDisableForPattern = isInsidePatternOverrides && ! hasOverrideEnabled
 Per-attribute bindings still fill from markup; they are just read-only in an
 instance.
 
+### Metadata the inserter adds
+
+`parsePattern()` stamps a single-block pattern with
+`metadata: { categories, patternName, name }`. For an instance that is wrong
+three times over: `patternName` names the companion entry rather than the
+pattern, its `--` has to be escaped to `\u002d\u002d` in the saved markup, and
+its presence makes the editor offer a Detach of its own that only strips the
+metadata again and leaves the instance looking untouched. `SyncedPatternEdit`
+removes it and keeps `name`, which is what the list view shows.
+
+The list view otherwise calls every pattern block "Pattern Placeholder". Core
+adds a label callback that would use `metadata.name`, but only for block types
+that support renaming, and `core/pattern` does not — so the plugin sets
+`__experimentalLabel` itself, which core's callback defers to.
+
 ### Not there yet
 
-WordPress renders no block toolbar for `core/pattern`, so there is nowhere to put
-a Detach control. The settings sidebar does show core's own Content panel listing
-the instance's slots.
+The Patterns screen labels a synced pattern "Not synced". `getPatternSyncStatus()`
+returns unsynced for every pattern whose type is not `user`, and the field is a
+DataViews definition with no filter, so this cannot be corrected from a plugin.
 
 ## What is removed
 

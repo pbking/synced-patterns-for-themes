@@ -81,6 +81,10 @@ the theme file and cannot be edited on the page — only the content slots can.
 Edit the file and every notice on the site changes with it, keeping whatever
 content each one was given.
 
+The block toolbar offers **Reset**, which puts the pattern's own content back,
+and **Detach**, which breaks the link and leaves ordinary editable blocks with
+the instance's content baked in.
+
 Unlike version 1, nothing is copied into the database to make this work: the
 theme file stays the only source of truth.
 
@@ -163,12 +167,13 @@ the theme.
 No, but `Inserter: no` in its header is usually what you want: a pattern that
 exists to be filled in has little to offer on its own.
 
-= How do I break the link on a page? =
+= Why does the Patterns screen say "Not synced"? =
 
-There is no Detach control yet. WordPress renders no block toolbar for a pattern
-block, so there is nowhere to put one; the settings sidebar shows WordPress's own
-Content panel listing the pattern's slots instead. Removing the block and
-inserting the pattern's blocks by hand is the workaround for now.
+Because WordPress decides that label by pattern type, not by behaviour: every
+pattern that is not a user pattern is reported as unsynced, with no filter to
+change it. The lock beside it is right — the pattern lives in a file and cannot
+be edited from the admin — but the wording is WordPress's, and this plugin
+cannot correct it.
 
 = Does it work in the site editor? =
 
@@ -190,6 +195,9 @@ design pattern's own content.
   registered by a plugin can be synced too.
 * Slots in a synced pattern must bind with `__default`; WordPress renders any
   other binding read-only inside an instance.
+* Added **Reset** and **Detach** to a synced pattern's toolbar.
+* The list view now names a pattern block after its pattern instead of calling
+  every one of them "Pattern Placeholder".
 
 = 2.0.0 =
 * Rewritten around a single idea: `core/pattern` accepts a `content` attribute,

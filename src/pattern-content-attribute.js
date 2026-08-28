@@ -34,6 +34,20 @@ export function addPatternContentAttribute( settings, name ) {
 			...settings.providesContext,
 			'pattern/overrides': 'content',
 		},
+		/*
+		 * Without this the list view calls every pattern block "Pattern
+		 * Placeholder". Core adds a label callback that would use the block's
+		 * own `metadata.name`, but only for block types that support renaming,
+		 * and `core/pattern` does not. Setting one here takes precedence: core's
+		 * callback returns early when a block type already has a label.
+		 */
+		__experimentalLabel: ( attributes, { context } ) => {
+			if ( context !== 'list-view' && context !== 'breadcrumb' ) {
+				return undefined;
+			}
+
+			return attributes?.metadata?.name || attributes?.slug;
+		},
 	};
 }
 
