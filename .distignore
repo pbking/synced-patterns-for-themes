@@ -1,9 +1,13 @@
+/.claude
 /.distignore
 /.git
 /.github
 /.gitignore
+/.phpunit.result.cache
 /.vscode
+/.wordpress-org
 /.wp-env.json
+/bin
 /bootstrap.php
 /composer.json
 /composer.lock
@@ -14,7 +18,11 @@
 /package-lock.json
 /phpcs.xml.dist
 /phpunit.xml
+/plugin-test-blueprint.json
 /readme.md
+/release
 /src
+/svn
 /tests
 /vendor
+*.zip

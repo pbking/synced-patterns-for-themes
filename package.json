@@ -18,6 +18,9 @@
     "plugin-test-env": "wp-now start --blueprint=plugin-test-blueprint.json --path=./release/synced-patterns-for-themes",
     "plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./synced-patterns-for-themes.zip -d ./release",
     "plugin-test": "npm run plugin-zip && npm run plugin-unpack && npm run plugin-test-env",
+    "plugin-ship": "./bin/ship.sh",
+    "plugin-ship:dry-run": "./bin/ship.sh --dry-run",
+    "plugin-ship:reset": "./bin/ship-reset.sh",
     "test:unit": "wp-scripts test-unit-js"
   },
   "devDependencies": {
