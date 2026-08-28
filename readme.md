@@ -27,7 +27,7 @@ offered it to theme patterns. This plugin does.
 ### 1. Mark the parts to fill in
 
 In the pattern that holds the design, name each block that should be filled and
-bind the attributes it fills. This is core's Pattern Overrides syntax, unchanged:
+mark it as a slot. This is core's Pattern Overrides syntax, unchanged:
 
 ```php
 <?php
@@ -39,11 +39,11 @@ bind the attributes it fills. This is core's Pattern Overrides syntax, unchanged
 ?>
 <!-- wp:cover {"url":"<?php echo esc_url( get_theme_file_uri( 'assets/hero.jpg' ) ); ?>","dimRatio":40} -->
 <div class="wp-block-cover">
-	<!-- wp:heading {"metadata":{"name":"headline","bindings":{"content":{"source":"core/pattern-overrides"}}}} -->
+	<!-- wp:heading {"metadata":{"name":"headline","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->
 	<h2 class="wp-block-heading">Headline goes here</h2>
 	<!-- /wp:heading -->
 
-	<!-- wp:paragraph {"metadata":{"name":"lede","bindings":{"content":{"source":"core/pattern-overrides"}}}} -->
+	<!-- wp:paragraph {"metadata":{"name":"lede","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->
 	<p>A sentence about what this section is for.</p>
 	<!-- /wp:paragraph -->
 </div>
@@ -51,10 +51,14 @@ bind the attributes it fills. This is core's Pattern Overrides syntax, unchanged
 ```
 
 * `metadata.name` names the slot.
-* `bindings` says which of that block's attributes the slot fills.
-* `{"__default":{"source":"core/pattern-overrides"}}` opens up every attribute the
-  block supports, instead of listing them.
-* `Inserter: no` keeps a pattern that exists to be filled in out of the inserter.
+* `__default` opens up every attribute the block supports, and is the form to
+  reach for — it is the only one WordPress will let someone type into inside a
+  synced pattern.
+* Naming attributes one by one — `{"content":{"source":"core/pattern-overrides"}}` —
+  also works when the content comes from markup.
+* `Inserter: no` keeps a pattern out of the inserter — worth doing for one that
+  only ever gets filled in from markup, but not for one marked `Synced: yes`,
+  which is meant to be inserted.
 
 ### 2. Fill them in
 
@@ -214,6 +218,9 @@ added.
 * WordPress 6.8 or later
 * PHP 7.4 or later
 
+Published on the [WordPress Plugin Directory](https://wordpress.org/plugins/synced-patterns-for-themes/);
+`readme.txt` is the copy that directory reads.
+
 ## Upgrading from 1.x
 
 Version 1 reached the same goal by copying theme patterns into the database as
@@ -242,6 +249,7 @@ composer run lint    # lint the PHP
 
 npm run start        # start WordPress at http://localhost:8978 (needs Docker)
 npm run test         # run the PHP tests against that environment
+npm run plugin-zip   # build the distributable zip (see .distignore)
 ```
 
 `dev-assets/themes/synced-patterns-test` is a small block theme that uses the

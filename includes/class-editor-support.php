@@ -234,6 +234,15 @@ class Editor_Support {
 			array( 'in_footer' => true )
 		);
 
+		/*
+		 * The editor script has translatable strings of its own, and without
+		 * this WordPress never hands it the translations it downloads.
+		 */
+		wp_set_script_translations(
+			'synced-patterns-for-themes',
+			'synced-patterns-for-themes'
+		);
+
 		wp_add_inline_script(
 			'synced-patterns-for-themes',
 			sprintf(

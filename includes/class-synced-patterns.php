@@ -67,7 +67,7 @@ class Synced_Patterns {
 		 * Patterns registered by a plugin have no file header to read, so this
 		 * is how they opt in.
 		 *
-		 * @since 2.1.0
+		 * @since 2.0.0
 		 *
 		 * @param string[] $slugs Pattern slugs, including namespace.
 		 */

@@ -4,7 +4,7 @@ Tags:              patterns, block patterns, synced patterns, block bindings, th
 Requires at least: 6.8
 Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        2.1.0
+Stable tag:        2.0.0
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,19 +31,22 @@ does is let a theme pattern accept it too.
 
 = Marking the parts to fill in =
 
-In the design pattern, give each block you want filled a name, and bind the
-attributes that should take a value. This is core's Pattern Overrides syntax,
-unchanged:
+In the design pattern, give each block you want filled a name and mark it as a
+slot. This is core's Pattern Overrides syntax, unchanged:
 
 `
-<!-- wp:heading {"metadata":{"name":"headline","bindings":{"content":{"source":"core/pattern-overrides"}}}} -->
+<!-- wp:heading {"metadata":{"name":"headline","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->
 <h2 class="wp-block-heading">Headline goes here</h2>
 <!-- /wp:heading -->
 `
 
-`metadata.name` names the slot. `bindings` says which of that block's attributes
-the slot fills. `bindings` can also be `{"__default":{"source":"core/pattern-overrides"}}`
-to open up every attribute the block supports.
+`metadata.name` names the slot. `__default` opens up every attribute the block
+supports, and is the form to reach for: it is the only one WordPress will let
+someone type into inside a synced pattern.
+
+Naming attributes one by one instead — `{"content":{"source":"core/pattern-overrides"}}` —
+also works when the content comes from markup, and is worth using when you want
+to fill exactly one attribute and leave the rest alone.
 
 = Filling them in =
 
@@ -88,24 +91,18 @@ the instance's content baked in.
 Unlike version 1, nothing is copied into the database to make this work: the
 theme file stays the only source of truth.
 
-**Slots in a synced pattern must bind with `__default`.** WordPress only lets you
-type into a bound field inside a pattern instance when the block binds that way:
-
-`
-<!-- wp:paragraph {"metadata":{"name":"message","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->
-<p>Edit this file and every notice changes with it.</p>
-<!-- /wp:paragraph -->
-`
-
-Naming attributes one by one — `{"content":{"source":"core/pattern-overrides"}}` —
-still works for content supplied from markup, but the editor renders those slots
-read-only inside an instance. That is WordPress's rule, not this plugin's.
+Slots in a synced pattern have to bind with `__default`. WordPress renders any
+other binding read-only inside an instance — that is its rule, not this
+plugin's.
 
 = Where it works =
 
 Patterns, templates, template parts, post content, and patterns inside other
-patterns, to any depth. In the editor, inserting a pattern that uses this gives
-you ordinary editable blocks with the right content already in them.
+patterns, to any depth.
+
+Inserting an ordinary pattern that fills another gives you plain editable blocks
+with the right content already in them. Inserting one marked `Synced: yes` gives
+you a live instance instead, still linked to its file.
 
 = What can be filled =
 
@@ -121,10 +118,12 @@ The list is core's, not this plugin's, so it grows as core's does.
 == Installation ==
 
 1. Install and activate the plugin.
-2. Add `metadata.name` and `core/pattern-overrides` bindings to the blocks in a
+2. Add `metadata.name` and a `core/pattern-overrides` binding to each block in a
    theme pattern you want to fill in.
-3. Use that pattern from another pattern, template or post with a `content`
-   attribute.
+3. Use that pattern from another pattern, template or post, passing a `content`
+   attribute on the pattern block.
+4. Optionally add `Synced: yes` to the design pattern's header, so inserting it
+   keeps it linked to the file rather than copying it.
 
 No settings, no admin screen. Nothing is written to the database.
 
@@ -162,10 +161,12 @@ fill in a synced pattern from the editor, and the values live in the database.
 This lets a *theme* fill in a pattern from block markup, and the values live in
 the theme.
 
-= Does the design pattern have to be hidden from the inserter? =
+= Should the design pattern be hidden from the inserter? =
 
-No, but `Inserter: no` in its header is usually what you want: a pattern that
-exists to be filled in has little to offer on its own.
+It depends which half you are using. A pattern that only ever gets filled in from
+markup has little to offer on its own, so `Inserter: no` keeps it out of the way.
+A pattern marked `Synced: yes` is meant to be inserted, so leave it visible — the
+plugin makes sure it is offered exactly once, as a live instance.
 
 = Why does the Patterns screen say "Not synced"? =
 
@@ -187,30 +188,25 @@ design pattern's own content.
 
 == Changelog ==
 
-= 2.1.0 =
-* `Synced: yes` in a pattern header keeps the pattern linked when it is
-  inserted, rendered live from the theme file with only its content slots
-  editable — without copying anything into the database.
+= 2.0.0 =
+* A pattern block can carry a `content` attribute, so one pattern supplies the
+  words for another pattern's design. Works in patterns, templates, template
+  parts and post content, and through patterns nested in patterns.
+* `Synced: yes` in a pattern header keeps a pattern linked when someone inserts
+  it: the page stores a reference, the design renders from the theme file and
+  cannot be edited there, and editing the file reaches every instance.
+* Nothing is copied into the database any more. The `pb_block` post type version
+  1 created, the twelve capabilities it granted, the writes it made on every
+  request, and the REST filters that made those posts look like reusable blocks
+  are all gone.
+* Patterns come from wherever WordPress registers them — parent themes, child
+  themes, `.php` and `.html` files, and plugins — instead of a glob over the
+  active theme's `patterns/*.php`.
 * Added the `synced_patterns_for_themes_synced_patterns` filter, so patterns
   registered by a plugin can be synced too.
 * Slots in a synced pattern must bind with `__default`; WordPress renders any
   other binding read-only inside an instance.
-* Added **Reset** and **Detach** to a synced pattern's toolbar.
-* The list view now names a pattern block after its pattern instead of calling
-  every one of them "Pattern Placeholder".
-
-= 2.0.0 =
-* Rewritten around a single idea: `core/pattern` accepts a `content` attribute,
-  the same way `core/block` already does.
-* Removed the `pb_block` custom post type, its capabilities, and the database
-  writes that kept it in sync on every request.
-* Removed the REST API filters that made those posts look like synced patterns.
-* `Synced: true` in a pattern header no longer copies the pattern into the
-  database. As of 2.1.0 it keeps the pattern linked instead.
-* Patterns now come from wherever WordPress registers them — parent themes,
-  child themes, `.php` and `.html` files, and plugins — instead of a glob over
-  the active theme's `patterns/*.php`.
-* Content now works in templates and template parts, not only in patterns.
+* Requires WordPress 6.8 and PHP 7.4.
 
 = 1.2.0 =
 * Added block bindings support for pattern content.
@@ -220,11 +216,7 @@ design pattern's own content.
 
 == Upgrade Notice ==
 
-= 2.1.0 =
-`Synced: yes` keeps a pattern linked when it is inserted, without copying it
-into the database.
-
 = 2.0.0 =
-A rewrite. Theme patterns are no longer copied into the database. Patterns now
-take their content from a `content` attribute on the pattern block. See the
-changelog before upgrading a live site.
+A rewrite. Theme patterns are no longer copied into the database: `Synced: yes`
+now keeps a pattern linked to its file instead. The `pb_block` posts version 1
+created are unused and safe to delete. Requires WordPress 6.8.
