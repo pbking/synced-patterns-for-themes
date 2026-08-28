@@ -1,7 +1,6 @@
-/vendor/
 /node_modules/
-/themes/
 /release/
+/svn/
+/vendor/
 *.zip
 .phpunit.result.cache
-/svn/

@@ -2,30 +2,41 @@
 /**
  * PHPUnit bootstrap file.
  *
- * @package Starter_Plugin
+ * @package SyncedPatternsForThemes
  */
 
 $_tests_dir = getenv( 'WP_TESTS_DIR' );
 
-// Forward custom PHPUnit Polyfills configuration to PHPUnit bootstrap file.
+if ( ! $_tests_dir ) {
+	$_tests_dir = __DIR__ . '/vendor/wp-phpunit/wp-phpunit';
+}
+
+if ( ! file_exists( "{$_tests_dir}/includes/functions.php" ) ) {
+	echo "Could not find the WordPress test suite at {$_tests_dir}." . PHP_EOL;
+	echo 'Run `composer install`, or set WP_TESTS_DIR.' . PHP_EOL;
+	exit( 1 );
+}
+
+// Forward custom PHPUnit Polyfills configuration to the PHPUnit bootstrap file.
 $_phpunit_polyfills_path = getenv( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' );
+
 if ( false !== $_phpunit_polyfills_path ) {
 	define( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH', $_phpunit_polyfills_path );
 }
 
-require 'vendor/autoload.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
-// Give access to tests_add_filter() function.
+// Gives access to tests_add_filter().
 require_once "{$_tests_dir}/includes/functions.php";
 
-/**
- * Manually load the plugin being tested.
- */
-function _manually_load_plugin() {
-	require dirname( dirname( __FILE__ ) ) . '/synced-patterns-for-themes/synced-patterns-for-themes.php';
-}
+tests_add_filter(
+	'muplugins_loaded',
+	static function () {
+		require __DIR__ . '/synced-patterns-for-themes.php';
+	}
+);
 
-tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );
-
-// Start up the WP testing environment.
 require "{$_tests_dir}/includes/bootstrap.php";
+
+// Depends on WP_UnitTestCase, so it can only be loaded once the suite has booted.
+require_once __DIR__ . '/tests/class-pattern-test-case.php';
