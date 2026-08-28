@@ -130,55 +130,22 @@ class Test_Synced_Patterns extends Pattern_Test_Case {
 	}
 
 	/**
-	 * A companion slug maps back to the pattern it stands for.
+	 * The companion entry's slug is derived from the pattern's own.
 	 */
-	public function test_companion_slug_round_trips() {
-		$companion = Synced_Patterns::get_inserter_slug( 'test/hero' );
-
-		$this->assertSame( 'test/hero', Synced_Patterns::get_source_slug( $companion ) );
-		$this->assertNull( Synced_Patterns::get_source_slug( 'test/hero' ) );
+	public function test_companion_slug_is_derived_from_the_pattern() {
+		$this->assertStringStartsWith( 'test/hero', Synced_Patterns::get_inserter_slug( 'test/hero' ) );
+		$this->assertNotSame( 'test/hero', Synced_Patterns::get_inserter_slug( 'test/hero' ) );
 	}
 
 	/**
-	 * The inserter offers the companion, and the pattern itself steps aside.
+	 * The reference markup names the pattern and carries no content of its own.
 	 */
-	public function test_companion_pattern_is_registered() {
-		$this->write_pattern_file( 'hero', 'test/hero', " * Synced: yes\n" );
-		$this->register_pattern( 'test/hero', $this->bound_heading(), array( 'title' => 'Hero' ) );
+	public function test_reference_markup_names_the_pattern() {
+		$markup = Synced_Patterns::get_reference_markup( 'test/hero' );
+		$blocks = parse_blocks( $markup );
 
-		Synced_Patterns::register_inserter_patterns();
-
-		$registry  = WP_Block_Patterns_Registry::get_instance();
-		$companion = Synced_Patterns::get_inserter_slug( 'test/hero' );
-
-		$this->assertTrue( $registry->is_registered( $companion ) );
-		$this->assertSame( 'Hero', $registry->get_registered( $companion )['title'] );
-		$this->assertSame(
-			Synced_Patterns::get_reference_markup( 'test/hero' ),
-			$registry->get_registered( $companion )['content']
-		);
-
-		// The pattern itself stays registered, so markup can still name it.
-		$this->assertTrue( $registry->is_registered( 'test/hero' ) );
-		$this->assertFalse( $registry->get_registered( 'test/hero' )['inserter'] );
-		$this->assertStringContainsString( 'Default headline', $registry->get_registered( 'test/hero' )['content'] );
-
-		$registry->unregister( $companion );
-	}
-
-	/**
-	 * A pattern already kept out of the inserter gets no companion.
-	 */
-	public function test_pattern_hidden_from_the_inserter_gets_no_companion() {
-		$this->write_pattern_file( 'hero', 'test/hero', " * Synced: yes\n" );
-		$this->register_pattern( 'test/hero', $this->bound_heading(), array( 'inserter' => false ) );
-
-		Synced_Patterns::register_inserter_patterns();
-
-		$this->assertFalse(
-			WP_Block_Patterns_Registry::get_instance()->is_registered(
-				Synced_Patterns::get_inserter_slug( 'test/hero' )
-			)
-		);
+		$this->assertCount( 1, $blocks );
+		$this->assertSame( 'core/pattern', $blocks[0]['blockName'] );
+		$this->assertSame( 'test/hero', $blocks[0]['attrs']['slug'] );
 	}
 }

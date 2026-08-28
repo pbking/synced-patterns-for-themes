@@ -32,11 +32,6 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 	public function tear_down() {
 		$registry = WP_Block_Patterns_Registry::get_instance();
 
-		// Companion patterns are registered by the plugin, not by the test.
-		foreach ( $this->registered as $slug ) {
-			$this->registered[] = \TwentyBellows\SyncedPatternsForThemes\Synced_Patterns::get_inserter_slug( $slug );
-		}
-
 		foreach ( $this->registered as $slug ) {
 			if ( $registry->is_registered( $slug ) ) {
 				$registry->unregister( $slug );

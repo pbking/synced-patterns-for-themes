@@ -65,6 +65,14 @@ class Editor_Support {
 	 * Core has already flattened the response by the time this runs, so the
 	 * content is recomposed from the pattern registry rather than patched.
 	 *
+	 * A synced pattern also gains a companion entry here. The inserter hands
+	 * over a pattern's blocks, so a pattern cannot offer a reference to itself;
+	 * the companion carries the same title and categories with a single
+	 * reference block as its content, and the pattern itself steps out of the
+	 * inserter in its place. The companion exists only in this response — it is
+	 * never registered, because nothing but the inserter ever asks for it, and
+	 * the block it inserts names the real pattern.
+	 *
 	 * @param WP_REST_Response|mixed $response Result to send to the client.
 	 * @param array|mixed            $handler  Route handler used for the request.
 	 * @param WP_REST_Request|mixed  $request  Request used to generate the response.
@@ -84,24 +92,12 @@ class Editor_Support {
 			return $response;
 		}
 
-		$registry = WP_Block_Patterns_Registry::get_instance();
-		$changed  = false;
+		$registry   = WP_Block_Patterns_Registry::get_instance();
+		$companions = array();
+		$changed    = false;
 
 		foreach ( $patterns as $index => $pattern ) {
 			if ( ! isset( $pattern['name'], $pattern['content'] ) || ! $registry->is_registered( $pattern['name'] ) ) {
-				continue;
-			}
-
-			$source_slug = Synced_Patterns::get_source_slug( $pattern['name'] );
-
-			/*
-			 * Core has just flattened this companion pattern into the blocks it
-			 * points at. Put the reference back: inserting it should link the
-			 * pattern, not copy it.
-			 */
-			if ( null !== $source_slug ) {
-				$patterns[ $index ]['content'] = Synced_Patterns::get_reference_markup( $source_slug );
-				$changed                       = true;
 				continue;
 			}
 
@@ -109,21 +105,51 @@ class Editor_Support {
 			$markup     = $registered['content'] ?? '';
 			$resolved   = Pattern_Resolver::resolve( $markup );
 
-			if ( $resolved === $markup ) {
-				continue;
+			if ( $resolved !== $markup ) {
+				// Let core finish the job for any plain pattern blocks left over.
+				$patterns[ $index ]['content'] = serialize_blocks( resolve_pattern_blocks( parse_blocks( $resolved ) ) );
+
+				$changed = true;
 			}
 
-			// Let core finish the job for any plain pattern blocks left over.
-			$patterns[ $index ]['content'] = serialize_blocks( resolve_pattern_blocks( parse_blocks( $resolved ) ) );
+			$companion = $this->build_companion_pattern( $patterns[ $index ] );
 
-			$changed = true;
+			if ( null !== $companion ) {
+				$patterns[ $index ]['inserter'] = false;
+				$companions[]                   = $companion;
+				$changed                        = true;
+			}
 		}
 
 		if ( $changed ) {
-			$response->set_data( $patterns );
+			$response->set_data( array_merge( $patterns, $companions ) );
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Builds the entry that offers a synced pattern to the inserter.
+	 *
+	 * @param array $pattern A prepared pattern from the REST response.
+	 * @return array|null The companion entry, or null if the pattern needs none.
+	 */
+	private function build_companion_pattern( array $pattern ): ?array {
+		if ( ! Synced_Patterns::is_synced( $pattern['name'] ) ) {
+			return null;
+		}
+
+		// A pattern already kept out of the inserter is only used from markup.
+		if ( isset( $pattern['inserter'] ) && ! $pattern['inserter'] ) {
+			return null;
+		}
+
+		$companion             = $pattern;
+		$companion['name']     = Synced_Patterns::get_inserter_slug( $pattern['name'] );
+		$companion['content']  = Synced_Patterns::get_reference_markup( $pattern['name'] );
+		$companion['inserter'] = true;
+
+		return $companion;
 	}
 
 	/**

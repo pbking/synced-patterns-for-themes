@@ -175,26 +175,61 @@ theme, and only ever from the editor: the front end renders a pattern reference
 the same way whether or not it was inserted as one, so it never needs to ask.
 
 The inserter hands over a pattern's blocks, so a pattern cannot offer a reference
-to itself. A companion pattern can: it carries the title and categories, its
+to itself. A companion entry can: it carries the title and categories, its
 content is one pattern block pointing at the real pattern, and the real pattern
-steps out of the inserter in its place. `Editor_Support` puts that reference back
-after core flattens it, the same hook that composes pattern content.
+steps out of the inserter in its place. That entry is synthesised in the REST
+response and never registered — nothing but the inserter asks for it, and the
+block it inserts names the real pattern.
+
+The first attempt registered it on `init` instead, behind a
+`wp_is_serving_rest_request()` gate. That gate is always false at `init`, because
+`REST_REQUEST` is defined from `parse_request`, so the companion was never
+registered on the one request that needed it and the editor kept offering the
+plain pattern. The tests called the registration helper directly and sailed past
+the broken wiring; they now go through a dispatched request instead.
 
 In the editor, `SyncedPatternEdit` renders the instance the way core's
 `ReusableBlockEdit` renders a synced pattern: the pattern's blocks are handed to
-`useInnerBlocksProps` as a controlled value with handlers that discard changes,
-which locks the design, while the slots stay editable through the bindings
-machinery.
+`useInnerBlocksProps` as a controlled value with handlers that discard changes.
 
-Writing an edit back is the one place this shadows core. The
-`core/pattern-overrides` source reads generically from block context — which
-`core/pattern` now provides — but `setValues` looks only for a `core/block`
-ancestor, and with none falls back to updating every block of the same name in
-the document. That is right when editing a pattern's own source and wrong inside
-an instance, where it would leak between two instances of the same pattern on one
-page. The source is re-registered with a `setValues` that recognises a pattern
-host and hands every other case back to core's original, so it becomes a no-op if
-core ever stores values on a pattern block itself.
+### Standing in for `core/block`
+
+Core keys two behaviours to the host's block name, and neither has a filter:
+
+* **Editing modes.** `getDerivedBlockEditingModesForTree()` collects hosts with
+  `block?.name === 'core/block'` and then marks bound descendants `contentOnly`
+  and everything else `disabled`. `useLockedDesign()` sets those modes explicitly
+  instead; an explicit mode wins, because the derivation skips any block that
+  already has one.
+* **Where an edit is stored.** `setValues` on the `core/pattern-overrides` source
+  looks only for a `core/block` ancestor, and with none updates every block of
+  the same name in the document — which would leak between two instances of one
+  pattern on a page. The registered source's `setValues` is amended in place.
+  Unregistering and re-registering is not an option: the client-side source
+  carries no `label`, registration requires one, and a failed re-registration
+  leaves the site with no pattern overrides at all. That failure was real, and
+  only a browser caught it.
+
+### What a theme author has to know
+
+A slot is only editable inside an instance when the block binds with
+`__default`. `RichText` disables a bound field whenever it sits in a
+`pattern/overrides` context without one:
+
+```js
+const isInsidePatternOverrides = !!blockContext?.[ 'pattern/overrides' ];
+const hasOverrideEnabled = blockBindings?.__default?.source === 'core/pattern-overrides';
+const shouldDisableForPattern = isInsidePatternOverrides && ! hasOverrideEnabled;
+```
+
+Per-attribute bindings still fill from markup; they are just read-only in an
+instance.
+
+### Not there yet
+
+WordPress renders no block toolbar for `core/pattern`, so there is nowhere to put
+a Detach control. The settings sidebar does show core's own Content panel listing
+the instance's slots.
 
 ## What is removed
 

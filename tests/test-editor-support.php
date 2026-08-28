@@ -139,26 +139,39 @@ class Test_Editor_Support extends Pattern_Test_Case {
 	}
 
 	/**
+	 * Marks a pattern as synced for the duration of a test.
+	 *
+	 * @param string $slug Pattern slug.
+	 * @return void
+	 */
+	private function mark_synced( string $slug ): void {
+		add_filter(
+			'synced_patterns_for_themes_synced_patterns',
+			static function ( $slugs ) use ( $slug ) {
+				$slugs[] = $slug;
+
+				return $slugs;
+			}
+		);
+
+		Synced_Patterns::flush();
+	}
+
+	/**
 	 * A synced pattern is offered to the inserter as a reference to itself.
+	 *
+	 * This goes through a real request rather than calling the plugin's own
+	 * helpers: the first version of this feature worked when called directly
+	 * and did nothing at all over REST, because it was wired to `init`, where
+	 * `wp_is_serving_rest_request()` is still false.
 	 */
 	public function test_synced_pattern_is_offered_as_a_reference() {
 		$this->register_pattern( 'test/hero', $this->bound_heading(), array( 'title' => 'Hero' ) );
-
-		$mark_synced = static function ( $slugs ) {
-			$slugs[] = 'test/hero';
-
-			return $slugs;
-		};
-
-		add_filter( 'synced_patterns_for_themes_synced_patterns', $mark_synced );
-		Synced_Patterns::flush();
-		Synced_Patterns::register_inserter_patterns();
+		$this->mark_synced( 'test/hero' );
 
 		$patterns  = $this->request_patterns();
 		$companion = $this->find_pattern( $patterns, Synced_Patterns::get_inserter_slug( 'test/hero' ) );
 		$design    = $this->find_pattern( $patterns, 'test/hero' );
-
-		remove_filter( 'synced_patterns_for_themes_synced_patterns', $mark_synced );
 
 		$this->assertNotNull( $companion, 'The inserter should be offered a reference.' );
 		$this->assertSame(
@@ -166,14 +179,54 @@ class Test_Editor_Support extends Pattern_Test_Case {
 			$companion['content'],
 			'Inserting it should link the pattern rather than copy it.'
 		);
+		$this->assertSame( 'Hero', $companion['title'] );
+		$this->assertTrue( $companion['inserter'] );
+
+		// The pattern itself steps aside so the inserter offers it only once.
+		$this->assertNotNull( $design );
+		$this->assertFalse( $design['inserter'] );
 
 		/*
-		 * The pattern itself still carries its blocks and their bindings, which
-		 * is what the editor renders the instance from.
+		 * It still carries its blocks and their bindings, which is what the
+		 * editor renders the instance from.
 		 */
-		$this->assertNotNull( $design );
 		$this->assertStringContainsString( 'core/pattern-overrides', $design['content'] );
 		$this->assertStringContainsString( 'Default headline', $design['content'] );
+	}
+
+	/**
+	 * A pattern already kept out of the inserter gets no companion.
+	 */
+	public function test_pattern_hidden_from_the_inserter_gets_no_companion() {
+		$this->register_pattern(
+			'test/hero',
+			$this->bound_heading(),
+			array( 'inserter' => false )
+		);
+		$this->mark_synced( 'test/hero' );
+
+		$this->assertNull(
+			$this->find_pattern(
+				$this->request_patterns(),
+				Synced_Patterns::get_inserter_slug( 'test/hero' )
+			)
+		);
+	}
+
+	/**
+	 * A pattern that is not synced is offered exactly as core offers it.
+	 */
+	public function test_unsynced_pattern_is_untouched() {
+		$this->register_pattern( 'test/plain', $this->bound_heading() );
+
+		$patterns = $this->request_patterns();
+		$plain    = $this->find_pattern( $patterns, 'test/plain' );
+
+		$this->assertNotNull( $plain );
+		$this->assertNotFalse( $plain['inserter'] ?? true );
+		$this->assertNull(
+			$this->find_pattern( $patterns, Synced_Patterns::get_inserter_slug( 'test/plain' ) )
+		);
 	}
 
 	/**

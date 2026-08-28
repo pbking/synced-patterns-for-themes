@@ -7,8 +7,6 @@
 
 namespace TwentyBellows\SyncedPatternsForThemes;
 
-use WP_Block_Patterns_Registry;
-
 /**
  * Reads the `Synced` header from a theme's pattern files.
  *
@@ -25,7 +23,7 @@ use WP_Block_Patterns_Registry;
 class Synced_Patterns {
 
 	/**
-	 * Suffix for the companion pattern that puts a reference in the inserter.
+	 * Suffix for the companion entry that puts a reference in the inserter.
 	 */
 	const INSERTER_SUFFIX = '--synced-instance';
 
@@ -98,20 +96,6 @@ class Synced_Patterns {
 	 */
 	public static function get_inserter_slug( string $slug ): string {
 		return $slug . self::INSERTER_SUFFIX;
-	}
-
-	/**
-	 * Returns the pattern a companion inserter pattern stands for.
-	 *
-	 * @param mixed $slug Pattern slug, including namespace.
-	 * @return string|null The pattern's slug, or null if this isn't a companion.
-	 */
-	public static function get_source_slug( $slug ): ?string {
-		if ( ! is_string( $slug ) || ! str_ends_with( $slug, self::INSERTER_SUFFIX ) ) {
-			return null;
-		}
-
-		return substr( $slug, 0, - strlen( self::INSERTER_SUFFIX ) );
 	}
 
 	/**
@@ -197,40 +181,4 @@ class Synced_Patterns {
 		return in_array( strtolower( trim( $value ) ), array( 'yes', 'true', '1', 'on' ), true );
 	}
 
-	/**
-	 * Registers the companion patterns that put a reference in the inserter.
-	 *
-	 * The inserter hands over a pattern's blocks, so a pattern cannot offer a
-	 * reference to itself. A companion pattern can: it carries the title and
-	 * categories, and its content is one pattern block pointing at the real
-	 * one, which is hidden from the inserter in its place.
-	 *
-	 * @return void
-	 */
-	public static function register_inserter_patterns(): void {
-		$registry = WP_Block_Patterns_Registry::get_instance();
-
-		foreach ( self::get_slugs() as $slug ) {
-			if ( ! $registry->is_registered( $slug ) ) {
-				continue;
-			}
-
-			$pattern = $registry->get_registered( $slug );
-
-			// A pattern kept out of the inserter is only used from markup.
-			if ( isset( $pattern['inserter'] ) && false === $pattern['inserter'] ) {
-				continue;
-			}
-
-			$companion            = $pattern;
-			$companion['content'] = self::get_reference_markup( $slug );
-			unset( $companion['filePath'], $companion['name'] );
-
-			register_block_pattern( self::get_inserter_slug( $slug ), $companion );
-
-			$pattern['inserter'] = false;
-			$registry->unregister( $slug );
-			register_block_pattern( $slug, $pattern );
-		}
-	}
 }

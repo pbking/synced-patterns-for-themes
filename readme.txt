@@ -81,11 +81,21 @@ the theme file and cannot be edited on the page — only the content slots can.
 Edit the file and every notice on the site changes with it, keeping whatever
 content each one was given.
 
-The block toolbar offers **Reset**, which puts the pattern's own content back,
-and **Detach**, which breaks the link and leaves ordinary editable blocks.
-
 Unlike version 1, nothing is copied into the database to make this work: the
 theme file stays the only source of truth.
+
+**Slots in a synced pattern must bind with `__default`.** WordPress only lets you
+type into a bound field inside a pattern instance when the block binds that way:
+
+`
+<!-- wp:paragraph {"metadata":{"name":"message","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->
+<p>Edit this file and every notice changes with it.</p>
+<!-- /wp:paragraph -->
+`
+
+Naming attributes one by one — `{"content":{"source":"core/pattern-overrides"}}` —
+still works for content supplied from markup, but the editor renders those slots
+read-only inside an instance. That is WordPress's rule, not this plugin's.
 
 = Where it works =
 
@@ -153,6 +163,13 @@ the theme.
 No, but `Inserter: no` in its header is usually what you want: a pattern that
 exists to be filled in has little to offer on its own.
 
+= How do I break the link on a page? =
+
+There is no Detach control yet. WordPress renders no block toolbar for a pattern
+block, so there is nowhere to put one; the settings sidebar shows WordPress's own
+Content panel listing the pattern's slots instead. Removing the block and
+inserting the pattern's blocks by hand is the workaround for now.
+
 = Does it work in the site editor? =
 
 Yes. Patterns, templates and template parts are all composed before the editor
@@ -169,9 +186,10 @@ design pattern's own content.
 * `Synced: yes` in a pattern header keeps the pattern linked when it is
   inserted, rendered live from the theme file with only its content slots
   editable — without copying anything into the database.
-* Added **Reset** and **Detach** to a synced pattern's toolbar.
 * Added the `synced_patterns_for_themes_synced_patterns` filter, so patterns
   registered by a plugin can be synced too.
+* Slots in a synced pattern must bind with `__default`; WordPress renders any
+  other binding read-only inside an instance.
 
 = 2.0.0 =
 * Rewritten around a single idea: `core/pattern` accepts a `content` attribute,

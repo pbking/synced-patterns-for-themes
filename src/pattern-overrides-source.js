@@ -15,11 +15,7 @@
  */
 
 import { store as blockEditorStore } from '@wordpress/block-editor';
-import {
-	getBlockBindingsSource,
-	registerBlockBindingsSource,
-	unregisterBlockBindingsSource,
-} from '@wordpress/blocks';
+import { getBlockBindingsSource } from '@wordpress/blocks';
 import { subscribe } from '@wordpress/data';
 
 import { getOverridesUpdate } from './get-overrides-update';
@@ -28,54 +24,66 @@ const SOURCE_NAME = 'core/pattern-overrides';
 const HOST_BLOCKS = [ 'core/block', 'core/pattern' ];
 
 /**
- * Re-registers the binding source with a pattern-aware `setValues`.
+ * Teaches the registered source to write to a pattern host.
+ *
+ * The source is amended in place rather than replaced. There is no supported
+ * way to replace one: `registerBlockBindingsSource()` refuses a name that is
+ * already registered, and unregistering first cannot be undone, because the
+ * client-side `core/pattern-overrides` object carries no `label` and
+ * registration requires one. Unregistering and failing to re-register would
+ * leave the site with no pattern overrides at all.
  *
  * @param {Object} source The registered binding source.
- * @return {void}
+ * @return {boolean} Whether the source was amended.
  */
 function extendSource( source ) {
 	const originalSetValues = source.setValues;
 
-	unregisterBlockBindingsSource( SOURCE_NAME );
+	if ( typeof originalSetValues !== 'function' ) {
+		return false;
+	}
 
-	registerBlockBindingsSource( {
-		...source,
-		setValues( args ) {
-			const { select, dispatch, clientId, bindings } = args;
-			const {
-				getBlockAttributes,
-				getBlockName,
-				getBlockParentsByBlockName,
-			} = select( blockEditorStore );
+	const setValues = ( args ) => {
+		const { select, dispatch, clientId, bindings } = args;
+		const { getBlockAttributes, getBlockName, getBlockParentsByBlockName } =
+			select( blockEditorStore );
 
-			const [ hostClientId ] = getBlockParentsByBlockName(
-				clientId,
-				HOST_BLOCKS,
-				true
-			);
+		const [ hostClientId ] = getBlockParentsByBlockName(
+			clientId,
+			HOST_BLOCKS,
+			true
+		);
 
-			const content = getOverridesUpdate( {
-				name: getBlockAttributes( clientId )?.metadata?.name,
-				hostBlockName: hostClientId
-					? getBlockName( hostClientId )
-					: undefined,
-				bindings,
-				content: getBlockAttributes( hostClientId )?.content,
-			} );
+		const content = getOverridesUpdate( {
+			name: getBlockAttributes( clientId )?.metadata?.name,
+			hostBlockName: hostClientId
+				? getBlockName( hostClientId )
+				: undefined,
+			bindings,
+			content: getBlockAttributes( hostClientId )?.content,
+		} );
 
-			if ( null === content ) {
-				return originalSetValues( args );
-			}
+		if ( null === content ) {
+			return originalSetValues( args );
+		}
 
-			dispatch( blockEditorStore ).updateBlockAttributes( hostClientId, {
-				content,
-			} );
-		},
-	} );
+		dispatch( blockEditorStore ).updateBlockAttributes( hostClientId, {
+			content,
+		} );
+	};
+
+	try {
+		source.setValues = setValues;
+	} catch ( error ) {
+		return false;
+	}
+
+	// A frozen source silently keeps its own function.
+	return source.setValues === setValues;
 }
 
 /**
- * Extends the binding source once core has registered it.
+ * Amends the binding source once core has registered it.
  *
  * The editor registers it while booting, which may be after this script runs,
  * so this waits for it rather than assuming it is already there.
@@ -83,23 +91,27 @@ function extendSource( source ) {
  * @return {void}
  */
 export function extendPatternOverridesSource() {
-	let extended = false;
+	let done = false;
 
 	const attempt = () => {
-		if ( extended ) {
+		if ( done ) {
 			return true;
 		}
 
+		/*
+		 * The server bootstraps this source with just a label and its context,
+		 * and the editor adds the functions later. Waiting for `setValues` is
+		 * what distinguishes the finished source from that stub.
+		 */
 		const source = getBlockBindingsSource( SOURCE_NAME );
 
-		if ( ! source?.setValues ) {
+		if ( typeof source?.setValues !== 'function' ) {
 			return false;
 		}
 
-		extended = true;
-		extendSource( source );
+		done = extendSource( source );
 
-		return true;
+		return done;
 	};
 
 	if ( attempt() ) {

@@ -12,9 +12,7 @@
  * bindings machinery reads and writes through it.
  */
 
-import { cloneBlock } from '@wordpress/blocks';
 import {
-	BlockControls,
 	RecursionProvider,
 	useBlockProps,
 	useHasRecursion,
@@ -22,26 +20,83 @@ import {
 	Warning,
 	store as blockEditorStore,
 } from '@wordpress/block-editor';
-import { ToolbarButton, ToolbarGroup } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
+import { useEffect } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
-
-import { applyContent } from './apply-content';
 
 const NOOP = () => {};
 const EMPTY_ARRAY = [];
+const OVERRIDES_SOURCE = 'core/pattern-overrides';
+
+/**
+ * Determines whether a block has a slot the instance can fill.
+ *
+ * @param {Object} block A block.
+ * @return {boolean} Whether any attribute is bound to pattern overrides.
+ */
+function hasContentSlot( block ) {
+	const bindings = block.attributes?.metadata?.bindings ?? {};
+
+	return Object.values( bindings ).some(
+		( binding ) => binding?.source === OVERRIDES_SOURCE
+	);
+}
+
+/**
+ * Locks the design of an instance, leaving its content slots editable.
+ *
+ * Core derives exactly this for a synced pattern, but the reducer that does it
+ * collects hosts by block name and only knows about `core/block`:
+ *
+ *     if ( block?.name === 'core/block' ) { syncedPatternClientIds.push( clientId ); }
+ *
+ * There is no filter on that, so the modes are set here instead. An explicit
+ * mode wins, because the derivation skips any block that already has one.
+ *
+ * @param {string} clientId The instance's client ID.
+ * @return {void}
+ */
+function useLockedDesign( clientId ) {
+	const blocks = useSelect(
+		( select ) => select( blockEditorStore ).getBlocks( clientId ),
+		[ clientId ]
+	);
+
+	const { setBlockEditingMode, unsetBlockEditingMode } =
+		useDispatch( blockEditorStore );
+
+	useEffect( () => {
+		const seen = [];
+
+		const walk = ( list ) => {
+			list.forEach( ( block ) => {
+				seen.push( block.clientId );
+				setBlockEditingMode(
+					block.clientId,
+					hasContentSlot( block ) ? 'contentOnly' : 'disabled'
+				);
+				walk( block.innerBlocks ?? [] );
+			} );
+		};
+
+		walk( blocks ?? [] );
+
+		return () => {
+			seen.forEach( ( id ) => unsetBlockEditingMode( id ) );
+		};
+	}, [ blocks, setBlockEditingMode, unsetBlockEditingMode ] );
+}
 
 /**
  * Renders one instance of a synced pattern.
  *
- * @param {Object}   props               Block props.
- * @param {Object}   props.attributes    Block attributes.
- * @param {string}   props.clientId      Block client ID.
- * @param {Function} props.setAttributes Attribute setter.
+ * @param {Object} props            Block props.
+ * @param {Object} props.attributes Block attributes.
+ * @param {string} props.clientId   Block client ID.
  * @return {JSX.Element} The instance.
  */
-export function SyncedPatternEdit( { attributes, clientId, setAttributes } ) {
-	const { slug, content } = attributes;
+export function SyncedPatternEdit( { attributes, clientId } ) {
+	const { slug } = attributes;
 
 	const pattern = useSelect(
 		( select ) =>
@@ -49,15 +104,14 @@ export function SyncedPatternEdit( { attributes, clientId, setAttributes } ) {
 		[ slug ]
 	);
 
-	const { replaceBlocks, __unstableMarkLastChangeAsPersistent } =
-		useDispatch( blockEditorStore );
-
 	const blockProps = useBlockProps();
 	const innerBlocksProps = useInnerBlocksProps( blockProps, {
 		value: pattern?.blocks ?? EMPTY_ARRAY,
 		onInput: NOOP,
 		onChange: NOOP,
 	} );
+
+	useLockedDesign( clientId );
 
 	if ( ! pattern ) {
 		return (
@@ -76,48 +130,34 @@ export function SyncedPatternEdit( { attributes, clientId, setAttributes } ) {
 		);
 	}
 
-	/**
-	 * Puts the pattern's own content back.
-	 */
-	const resetContent = () => {
-		__unstableMarkLastChangeAsPersistent();
-		setAttributes( { content: undefined } );
-	};
+	return <div { ...innerBlocksProps } />;
+}
 
-	/**
-	 * Breaks the link, leaving ordinary editable blocks behind.
-	 */
-	const detach = () => {
-		replaceBlocks(
-			clientId,
-			applyContent( pattern.blocks, content ).map( ( block ) =>
-				cloneBlock( block )
-			)
-		);
-	};
+/**
+ * Shown in place of a pattern that contains itself.
+ *
+ * @return {JSX.Element} The warning.
+ */
+function RecursionWarning() {
+	const blockProps = useBlockProps();
 
 	return (
-		<>
-			<BlockControls group="other">
-				<ToolbarGroup>
-					<ToolbarButton
-						onClick={ resetContent }
-						disabled={ ! content }
-					>
-						{ __( 'Reset', 'synced-patterns-for-themes' ) }
-					</ToolbarButton>
-					<ToolbarButton onClick={ detach }>
-						{ __( 'Detach', 'synced-patterns-for-themes' ) }
-					</ToolbarButton>
-				</ToolbarGroup>
-			</BlockControls>
-			<div { ...innerBlocksProps } />
-		</>
+		<div { ...blockProps }>
+			<Warning>
+				{ __(
+					'This pattern cannot be rendered inside itself.',
+					'synced-patterns-for-themes'
+				) }
+			</Warning>
+		</div>
 	);
 }
 
 /**
  * Stops a synced pattern that contains itself from rendering forever.
+ *
+ * `useBlockProps()` belongs to whichever component actually renders the block,
+ * so it is called in the warning or in the instance, never in both.
  *
  * @param {Object} props Block props.
  * @return {JSX.Element} The instance, or a warning.
@@ -125,19 +165,9 @@ export function SyncedPatternEdit( { attributes, clientId, setAttributes } ) {
 export function SyncedPatternEditWithRecursionCheck( props ) {
 	const { slug } = props.attributes;
 	const hasAlreadyRendered = useHasRecursion( slug );
-	const blockProps = useBlockProps();
 
 	if ( hasAlreadyRendered ) {
-		return (
-			<div { ...blockProps }>
-				<Warning>
-					{ __(
-						'This pattern cannot be rendered inside itself.',
-						'synced-patterns-for-themes'
-					) }
-				</Warning>
-			</div>
-		);
+		return <RecursionWarning />;
 	}
 
 	return (

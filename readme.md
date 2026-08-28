@@ -101,11 +101,29 @@ synced pattern instead.
 
 Inserting it stores a reference, not a copy. The design comes from the theme file
 and cannot be edited on the page; only the slots can. Change the file and every
-use changes, each keeping the content it was given. **Reset** puts the pattern's
-own content back; **Detach** breaks the link and leaves ordinary blocks.
+use changes, each keeping the content it was given.
 
 Nothing is copied into the database to make this work — unlike version 1, the
 theme file stays the only source of truth.
+
+**Slots in a synced pattern must bind with `__default`**, as above. WordPress
+only lets you type into a bound field inside a pattern instance when the block
+binds that way:
+
+```js
+// editable inside an instance
+"bindings": { "__default": { "source": "core/pattern-overrides" } }
+
+// fills from markup, but read-only inside an instance
+"bindings": { "content": { "source": "core/pattern-overrides" } }
+```
+
+That rule is WordPress's, not this plugin's — `RichText` disables a bound field
+whenever it is inside a `pattern/overrides` context without a `__default`
+binding.
+
+There is no Detach control yet: WordPress renders no block toolbar for a pattern
+block, so there is nowhere to put one.
 
 Patterns registered by a plugin have no header to read, so they opt in through a
 filter:
@@ -161,18 +179,28 @@ expands into ordinary blocks.
 **A synced instance** is rendered the way core renders a synced pattern, in
 `src/synced-pattern-edit.js`: the pattern's blocks go to `useInnerBlocksProps` as
 a controlled value whose handlers discard changes, which is what locks the
-design, while the slots stay editable through the bindings machinery. The
-inserter is offered a companion pattern whose content is a single reference
-block, because a pattern cannot otherwise offer a reference to itself.
+design. The inserter is offered a companion entry whose content is a single
+reference block, because a pattern cannot otherwise offer a reference to itself;
+that entry is synthesised in the REST response rather than registered.
 
-One thing to know about: core's `core/pattern-overrides` binding source reads
-generically from block context, but writes only to a `core/block` ancestor —
-with a `core/pattern` host it falls back to updating every block of the same
-name in the document. `src/pattern-overrides-source.js` re-registers the source
-with a `setValues` that recognises a pattern host and hands every other case
-back to core's original. That is the one place this shadows a core
-implementation, and the first place to look if a WordPress update breaks slot
-editing.
+Two core behaviours are keyed to `core/block` by name, and a `core/pattern` host
+has to stand in for each:
+
+* **Editing modes.** Core derives "design locked, slots editable" in a reducer
+  that collects hosts with `block?.name === 'core/block'`. There is no filter, so
+  `useLockedDesign()` sets those modes explicitly with `setBlockEditingMode()` —
+  an explicit mode wins, because the derivation skips blocks that already have
+  one.
+* **Where an edit is stored.** The `core/pattern-overrides` source reads from
+  block context generically, but `setValues` looks only for a `core/block`
+  ancestor and otherwise updates every block of the same name in the document —
+  which would leak between two instances of one pattern on a page.
+  `src/pattern-overrides-source.js` amends the registered source's `setValues` in
+  place. It deliberately does *not* unregister and re-register: the client-side
+  source carries no `label`, registration requires one, and a failed
+  re-registration would leave the site with no pattern overrides at all.
+
+Those two are the first places to look if a WordPress update breaks slot editing.
 
 Nothing is written to the database, and no post type, capability or REST route is
 added.
