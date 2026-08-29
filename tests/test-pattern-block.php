@@ -27,6 +27,40 @@ class Test_Pattern_Block extends Pattern_Test_Case {
 	}
 
 	/**
+	 * A second, identical runtime provider leaves the first one's registration alone.
+	 */
+	public function test_content_support_defers_to_an_existing_provider() {
+		$pattern_block = new \TwentyBellows\SyncedPatternsForThemes\Pattern_Block();
+
+		$render_callback = static function () {
+			return '';
+		};
+
+		$args = array(
+			'attributes'       => array( 'content' => array( 'type' => 'object' ) ),
+			'provides_context' => array( 'pattern/overrides' => 'content' ),
+			'render_callback'  => $render_callback,
+		);
+
+		$filtered = $pattern_block->add_content_support( $args, 'core/pattern' );
+
+		$this->assertSame( $render_callback, $filtered['render_callback'] );
+		$this->assertSame( $args, $filtered );
+	}
+
+	/**
+	 * A theme switch drops the cached synced-pattern lookup.
+	 */
+	public function test_theme_switch_flushes_the_synced_lookup() {
+		$this->assertNotFalse(
+			has_action(
+				'switch_theme',
+				array( \TwentyBellows\SyncedPatternsForThemes\Synced_Patterns::class, 'flush' )
+			)
+		);
+	}
+
+	/**
 	 * Content on the pattern block reaches the pattern's bound blocks.
 	 */
 	public function test_content_fills_a_slot() {

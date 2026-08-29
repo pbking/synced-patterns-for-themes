@@ -5,7 +5,7 @@
  * Description:       Lets block markup supply the content for a pattern, so one pattern can carry the design and another can carry the words.
  * Requires at least: 6.8
  * Requires PHP:      7.4
- * Version:           2.0.0
+ * Version:           2.0.1
  * Author:            Twenty Bellows
  * Author URI:        https://twentybellows.com
  * License:           GPL-2.0-or-later
