@@ -189,10 +189,7 @@ design pattern's own content.
 == Changelog ==
 
 = 2.0.1 =
-* Stands down entirely when Pattern Builder 2.0+ is active: Pattern Builder
-  ships this same pattern runtime as part of its editing suite, so this
-  plugin simply doesn't load alongside it — deactivate Pattern Builder and
-  this plugin takes over again with identical behavior.
+* Does not load when Pattern Builder 2.0+ is active.
 * The cached synced-pattern lookup is flushed when the theme is switched.
 
 = 2.0.0 =
