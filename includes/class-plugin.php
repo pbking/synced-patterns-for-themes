@@ -49,5 +49,8 @@ final class Plugin {
 	public function register(): void {
 		( new Pattern_Block() )->register();
 		( new Editor_Support( $this->file ) )->register();
+
+		// A theme switch changes which pattern files the synced lookup reads.
+		add_action( 'switch_theme', array( Synced_Patterns::class, 'flush' ) );
 	}
 }

@@ -27,6 +27,18 @@ class Test_Pattern_Block extends Pattern_Test_Case {
 	}
 
 	/**
+	 * A theme switch drops the cached synced-pattern lookup.
+	 */
+	public function test_theme_switch_flushes_the_synced_lookup() {
+		$this->assertNotFalse(
+			has_action(
+				'switch_theme',
+				array( \TwentyBellows\SyncedPatternsForThemes\Synced_Patterns::class, 'flush' )
+			)
+		);
+	}
+
+	/**
 	 * Content on the pattern block reaches the pattern's bound blocks.
 	 */
 	public function test_content_fills_a_slot() {

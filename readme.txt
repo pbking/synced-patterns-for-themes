@@ -4,7 +4,7 @@ Tags:              patterns, block patterns, synced patterns, block bindings, th
 Requires at least: 6.8
 Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        2.0.0
+Stable tag:        2.0.1
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,10 @@ Nothing happens. Unknown slots are ignored, and slots with no value keep the
 design pattern's own content.
 
 == Changelog ==
+
+= 2.0.1 =
+* Does not load when Pattern Builder 2.0+ is active.
+* The cached synced-pattern lookup is flushed when the theme is switched.
 
 = 2.0.0 =
 * A pattern block can carry a `content` attribute, so one pattern supplies the
