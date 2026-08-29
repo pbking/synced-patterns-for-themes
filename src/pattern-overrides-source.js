@@ -43,11 +43,6 @@ function extendSource( source ) {
 		return false;
 	}
 
-	// A compatible plugin (or an earlier run) already amended the source.
-	if ( originalSetValues.patternHostAmended ) {
-		return true;
-	}
-
 	const setValues = ( args ) => {
 		const { select, dispatch, clientId, bindings } = args;
 		const { getBlockAttributes, getBlockName, getBlockParentsByBlockName } =
@@ -76,9 +71,6 @@ function extendSource( source ) {
 			content,
 		} );
 	};
-
-	// The marker lets another copy of this amendment detect and skip this one.
-	setValues.patternHostAmended = true;
 
 	try {
 		source.setValues = setValues;

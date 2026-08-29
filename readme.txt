@@ -189,12 +189,10 @@ design pattern's own content.
 == Changelog ==
 
 = 2.0.1 =
-* Plays well with other providers of the pattern runtime: if another plugin
-  (such as Pattern Builder 2.0) has already given `core/pattern` its content
-  attribute and render callback, this plugin leaves that registration in
-  place instead of replacing it — and its editor-side amendment of the
-  pattern-overrides source now carries a marker so a second copy can detect
-  it and stand down.
+* Stands down entirely when Pattern Builder 2.0+ is active: Pattern Builder
+  ships this same pattern runtime as part of its editing suite, so this
+  plugin simply doesn't load alongside it — deactivate Pattern Builder and
+  this plugin takes over again with identical behavior.
 * The cached synced-pattern lookup is flushed when the theme is switched.
 
 = 2.0.0 =

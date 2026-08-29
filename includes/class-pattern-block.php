@@ -59,17 +59,6 @@ class Pattern_Block {
 			return $args;
 		}
 
-		/*
-		 * Another plugin may already have installed this same runtime — the
-		 * attribute and context shapes are core's, so any provider of both is
-		 * compatible by construction. Leaving its render callback in place
-		 * keeps ownership deterministic instead of last-filter-wins.
-		 */
-		if ( isset( $args['attributes'][ self::CONTENT_ATTRIBUTE ] )
-			&& isset( $args['provides_context'][ self::OVERRIDES_CONTEXT ] ) ) {
-			return $args;
-		}
-
 		if ( ! isset( $args['attributes'] ) || ! is_array( $args['attributes'] ) ) {
 			$args['attributes'] = array();
 		}
