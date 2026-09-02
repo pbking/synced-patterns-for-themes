@@ -180,5 +180,4 @@ class Synced_Patterns {
 	private static function header_means_yes( string $value ): bool {
 		return in_array( strtolower( trim( $value ) ), array( 'yes', 'true', '1', 'on' ), true );
 	}
-
 }

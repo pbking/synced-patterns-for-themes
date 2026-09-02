@@ -24,6 +24,14 @@ use WP_Block_Patterns_Registry;
  * result is ordinary editable content: values written into the markup, and the
  * `core/pattern-overrides` bindings that asked for them removed. Whatever this
  * leaves behind is a plain pattern block that core resolves as it always has.
+ *
+ * A reference to a *synced* pattern is the one thing never composed. It is a
+ * reference by definition — the editor renders it as an instance, design
+ * locked and slots editable, and the front end renders it from the file — so
+ * writing its content in would hand the editor a copy with the design
+ * unlocked and the link gone. It is kept exactly as written, content and all,
+ * and `compose()` exists so the editor's pattern list can inline everything
+ * else the way core does without core's resolver flattening these too.
  */
 class Pattern_Resolver {
 
@@ -46,6 +54,14 @@ class Pattern_Resolver {
 	 * @var array<string, true>
 	 */
 	private static $expanding = array();
+
+	/**
+	 * Whether plain pattern blocks — no content, none inside — are inlined
+	 * too, the way core's own resolver inlines them. Set by `compose()`.
+	 *
+	 * @var bool
+	 */
+	private static $inline_plain = false;
 
 	/**
 	 * Cheap test for markup that might contain a pattern block.
@@ -77,6 +93,37 @@ class Pattern_Resolver {
 		$blocks     = self::resolve_blocks( parse_blocks( $markup ) );
 
 		return self::$expansions === $expansions ? $markup : serialize_blocks( $blocks );
+	}
+
+	/**
+	 * Composes a pattern the way the editor's pattern list needs it.
+	 *
+	 * Core flattens every `core/pattern` block in that list server side
+	 * (`resolve_pattern_blocks()`), which loses the content attribute and
+	 * turns a synced reference into a copy. This does core's job instead:
+	 * content is written in, plain references are inlined the way core
+	 * inlines them, and synced references are left as written for the
+	 * editor to render as instances.
+	 *
+	 * @param string $markup Block markup.
+	 * @return string Block markup with every pattern block composed into it,
+	 *                except the synced references, or the markup untouched if
+	 *                there were none.
+	 */
+	public static function compose( string $markup ): string {
+		if ( ! self::contains_pattern_block( $markup ) ) {
+			return $markup;
+		}
+
+		self::$inline_plain = true;
+
+		try {
+			$blocks = self::resolve_blocks( parse_blocks( $markup ) );
+		} finally {
+			self::$inline_plain = false;
+		}
+
+		return serialize_blocks( $blocks );
 	}
 
 	/**
@@ -162,7 +209,11 @@ class Pattern_Resolver {
 	 * A pattern block with no content of its own is still expanded when the
 	 * pattern it points at reaches one that has some — otherwise core would
 	 * flatten its way down to that pattern and drop the content. A pattern
-	 * block that leads nowhere near any content is left for core.
+	 * block that leads nowhere near any content is left for core, unless
+	 * `compose()` asked for it to be inlined here instead.
+	 *
+	 * A reference to a synced pattern is never expanded: it is returned as
+	 * written, content and all, so the editor renders it as an instance.
 	 *
 	 * @param array $block A parsed `core/pattern` block.
 	 * @return array[]|null The blocks that replace it, an empty array to drop
@@ -177,6 +228,15 @@ class Pattern_Resolver {
 			return null;
 		}
 
+		/*
+		 * Kept, not left to core: null would hand it to `resolve_pattern_blocks()`,
+		 * which inlines it and drops the content, and that is exactly the copy
+		 * a synced pattern must never become.
+		 */
+		if ( Synced_Patterns::is_synced( $slug ) ) {
+			return array( $block );
+		}
+
 		// A pattern that contains itself is dropped, the way core drops it.
 		if ( isset( self::$expanding[ $slug ] ) ) {
 			return array();
@@ -185,7 +245,7 @@ class Pattern_Resolver {
 		$pattern     = $registry->get_registered( $slug );
 		$has_content = is_array( $content ) && ! empty( $content );
 
-		if ( ! $has_content && ! self::contains_pattern_block( $pattern['content'] ?? null ) ) {
+		if ( ! self::$inline_plain && ! $has_content && ! self::contains_pattern_block( $pattern['content'] ?? null ) ) {
 			return null;
 		}
 
@@ -202,7 +262,7 @@ class Pattern_Resolver {
 		unset( self::$expanding[ $slug ] );
 
 		// Nothing inside needed this resolver, so core should expand it instead.
-		if ( ! $has_content && self::$expansions === $expansions ) {
+		if ( ! self::$inline_plain && ! $has_content && self::$expansions === $expansions ) {
 			return null;
 		}
 

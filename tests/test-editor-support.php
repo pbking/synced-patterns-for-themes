@@ -72,6 +72,84 @@ class Test_Editor_Support extends Pattern_Test_Case {
 	}
 
 	/**
+	 * A reference to a synced pattern survives the list, content and all.
+	 *
+	 * Core's resolver would inline it — the design unlocked, the link gone —
+	 * so the editor could never show a page pattern's synced sections as the
+	 * instances they are. The reference stays; the editor renders it.
+	 */
+	public function test_patterns_endpoint_keeps_synced_references() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$page = $this->register_pattern(
+			'test/page',
+			'<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group">'
+			. $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'From the page pattern' ) ) )
+			. '</div><!-- /wp:group -->'
+		);
+
+		$pattern = $this->find_pattern( $this->request_patterns(), $page );
+
+		$this->assertNotNull( $pattern );
+
+		$blocks = parse_blocks( $pattern['content'] );
+		$this->assertSame( 'core/group', $blocks[0]['blockName'] );
+
+		$reference = $blocks[0]['innerBlocks'][0];
+		$this->assertSame( 'core/pattern', $reference['blockName'], 'The synced pattern should still be a reference.' );
+		$this->assertSame( $hero, $reference['attrs']['slug'] );
+		$this->assertSame(
+			array( 'headline' => array( 'content' => 'From the page pattern' ) ),
+			$reference['attrs']['content'],
+			'The reference should keep the content the page gave it.'
+		);
+		$this->assertStringNotContainsString( 'Default headline', $pattern['content'] );
+	}
+
+	/**
+	 * Plain references beside a synced one are still inlined, as core would.
+	 */
+	public function test_patterns_endpoint_inlines_plain_references_beside_synced_ones() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$plain = $this->register_pattern(
+			'test/plain',
+			'<!-- wp:paragraph --><p>Inlined by the plugin</p><!-- /wp:paragraph -->'
+		);
+		$page  = $this->register_pattern( 'test/page', $this->pattern_block( $plain ) . $this->pattern_block( $hero ) );
+
+		$pattern = $this->find_pattern( $this->request_patterns(), $page );
+
+		$this->assertNotNull( $pattern );
+
+		$names = array_column( parse_blocks( $pattern['content'] ), 'blockName' );
+		$this->assertContains( 'core/paragraph', $names, 'The plain pattern should be inlined.' );
+		$this->assertContains( 'core/pattern', $names, 'The synced pattern should stay a reference.' );
+		$this->assertSame( 1, substr_count( $pattern['content'], 'wp:pattern ' ) );
+	}
+
+	/**
+	 * A template keeps its synced references for the editor as well.
+	 */
+	public function test_template_keeps_synced_references_for_the_editor() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$template          = new WP_Block_Template();
+		$template->content = $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'From the template' ) ) );
+
+		add_filter( 'synced_patterns_for_themes_is_editor_request', '__return_true' );
+		$filtered = apply_filters( 'get_block_template', $template, 'test//index', 'wp_template' );
+		remove_filter( 'synced_patterns_for_themes_is_editor_request', '__return_true' );
+
+		$this->assertStringContainsString( 'wp:pattern', $filtered->content );
+		$this->assertStringContainsString( 'From the template', $filtered->content );
+		$this->assertStringNotContainsString( 'Default headline', $filtered->content );
+	}
+
+	/**
 	 * Patterns that use no content are left exactly as core prepares them.
 	 */
 	public function test_patterns_endpoint_leaves_other_patterns_alone() {
@@ -136,25 +214,6 @@ class Test_Editor_Support extends Pattern_Test_Case {
 		remove_filter( 'synced_patterns_for_themes_is_editor_request', '__return_true' );
 
 		$this->assertStringContainsString( 'In a list', $filtered[0]->content );
-	}
-
-	/**
-	 * Marks a pattern as synced for the duration of a test.
-	 *
-	 * @param string $slug Pattern slug.
-	 * @return void
-	 */
-	private function mark_synced( string $slug ): void {
-		add_filter(
-			'synced_patterns_for_themes_synced_patterns',
-			static function ( $slugs ) use ( $slug ) {
-				$slugs[] = $slug;
-
-				return $slugs;
-			}
-		);
-
-		Synced_Patterns::flush();
 	}
 
 	/**

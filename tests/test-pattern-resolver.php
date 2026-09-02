@@ -216,6 +216,82 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 	}
 
 	/**
+	 * A reference to a synced pattern is kept as written, content included.
+	 */
+	public function test_synced_reference_is_kept() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$markup = $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'Stays a reference' ) ) );
+
+		$this->assertSame( $markup, Pattern_Resolver::resolve( $markup ) );
+	}
+
+	/**
+	 * A synced reference reached through an unsynced pattern is kept too,
+	 * while the pattern around it is composed.
+	 */
+	public function test_synced_reference_inside_a_composed_pattern_is_kept() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$page = $this->register_pattern(
+			'test/page',
+			$this->bound_heading( 'Page title' )
+			. $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'Section' ) ) )
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $page, array( 'headline' => array( 'content' => 'Composed title' ) ) )
+		);
+
+		$blocks = array_values( array_filter( parse_blocks( $resolved ), static fn( $block ) => null !== $block['blockName'] ) );
+
+		$this->assertSame( 'core/heading', $blocks[0]['blockName'] );
+		$this->assertStringContainsString( 'Composed title', $resolved );
+		$this->assertSame( 'core/pattern', $blocks[1]['blockName'] );
+		$this->assertSame( $hero, $blocks[1]['attrs']['slug'] );
+		$this->assertSame( array( 'headline' => array( 'content' => 'Section' ) ), $blocks[1]['attrs']['content'] );
+	}
+
+	/**
+	 * `compose()` inlines plain references the way core does, and only those.
+	 */
+	public function test_compose_inlines_plain_references_and_keeps_synced_ones() {
+		$hero  = $this->register_pattern( 'test/hero', $this->bound_heading(), array( 'title' => 'Hero' ) );
+		$plain = $this->register_pattern(
+			'test/plain',
+			'<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph -->',
+			array( 'title' => 'Plain' )
+		);
+		$this->mark_synced( $hero );
+
+		$composed = Pattern_Resolver::compose( $this->pattern_block( $plain ) . $this->pattern_block( $hero ) );
+
+		$blocks = array_values( array_filter( parse_blocks( $composed ), static fn( $block ) => null !== $block['blockName'] ) );
+
+		$this->assertCount( 2, $blocks );
+		$this->assertSame( 'core/paragraph', $blocks[0]['blockName'] );
+		$this->assertSame( $plain, $blocks[0]['attrs']['metadata']['patternName'], 'An inlined pattern reads as an instance, as core marks it.' );
+		$this->assertSame( 'Plain', $blocks[0]['attrs']['metadata']['name'] );
+		$this->assertSame( 'core/pattern', $blocks[1]['blockName'] );
+		$this->assertSame( $hero, $blocks[1]['attrs']['slug'] );
+	}
+
+	/**
+	 * `compose()` does not change what `resolve()` does afterwards: a plain
+	 * reference is still left for core there.
+	 */
+	public function test_resolve_still_leaves_plain_references_after_compose() {
+		$plain = $this->register_pattern( 'test/plain', '<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph -->' );
+
+		Pattern_Resolver::compose( $this->pattern_block( $plain ) );
+
+		$markup = $this->pattern_block( $plain );
+		$this->assertSame( $markup, Pattern_Resolver::resolve( $markup ) );
+	}
+
+	/**
 	 * A pattern that includes itself is dropped rather than recursing.
 	 */
 	public function test_self_referencing_pattern_is_dropped() {
