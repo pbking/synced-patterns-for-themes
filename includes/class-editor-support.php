@@ -17,8 +17,10 @@ use WP_REST_Response;
  *
  * Since WordPress 6.6 core flattens `core/pattern` blocks server side so the
  * editor doesn't have to (`resolve_pattern_blocks()`), and flattening throws
- * away everything but the pattern's slug. These two hooks compose the patterns
- * first, so what core flattens already has its content in place.
+ * away everything but the pattern's slug — the content, and whether the
+ * reference was to a synced pattern at all. The pattern list is recomposed
+ * from the registry after core has flattened it; templates are composed
+ * before the editor sees them, with anything plain left for the editor.
  *
  * Both are cheap on sites that don't use the feature: the markup is only parsed
  * when a substring check says it might be worth it.
@@ -63,7 +65,11 @@ class Editor_Support {
 	 * Composes the patterns the editor lists, previews and inserts.
 	 *
 	 * Core has already flattened the response by the time this runs, so the
-	 * content is recomposed from the pattern registry rather than patched.
+	 * content is recomposed from the pattern registry rather than patched:
+	 * content written in, plain references inlined as core inlines them, and
+	 * references to synced patterns kept as written — with their content —
+	 * for the editor to render as instances. Core's own resolver is never
+	 * run over the result, since it would flatten those too.
 	 *
 	 * A synced pattern also gains a companion entry here. The inserter hands
 	 * over a pattern's blocks, so a pattern cannot offer a reference to itself;
@@ -103,11 +109,9 @@ class Editor_Support {
 
 			$registered = $registry->get_registered( $pattern['name'] );
 			$markup     = $registered['content'] ?? '';
-			$resolved   = Pattern_Resolver::resolve( $markup );
 
-			if ( $resolved !== $markup ) {
-				// Let core finish the job for any plain pattern blocks left over.
-				$patterns[ $index ]['content'] = serialize_blocks( resolve_pattern_blocks( parse_blocks( $resolved ) ) );
+			if ( Pattern_Resolver::contains_pattern_block( $markup ) ) {
+				$patterns[ $index ]['content'] = Pattern_Resolver::compose( $markup );
 
 				$changed = true;
 			}
