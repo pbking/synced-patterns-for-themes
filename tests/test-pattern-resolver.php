@@ -379,4 +379,134 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( 'Default headline', $resolved );
 		$this->assertStringNotContainsString( 'Should not appear', $resolved );
 	}
+
+	/**
+	 * Emptying a caption takes the `figcaption` with it.
+	 *
+	 * `core/image` only writes the element when there is something to put in
+	 * it, so an empty one left behind is markup no version of the block would
+	 * save. Resolving strips the bindings that would have excused it, and the
+	 * editor then reports the block as invalid.
+	 */
+	public function test_empty_caption_removes_the_figcaption() {
+		$slug = $this->register_pattern(
+			'test/photo',
+			'<!-- wp:image {"metadata":{"name":"photo","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<figure class="wp-block-image"><img src="https://example.org/default.png" alt="Default alt"/>'
+			. '<figcaption class="wp-element-caption">Default caption</figcaption></figure>'
+			. '<!-- /wp:image -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block(
+				$slug,
+				array(
+					'photo' => array(
+						'url'     => 'https://example.org/filled.png',
+						'alt'     => 'Filled alt',
+						'caption' => '',
+					),
+				)
+			)
+		);
+
+		$this->assertStringNotContainsString( 'figcaption', $resolved );
+		$this->assertStringNotContainsString( 'Default caption', $resolved );
+		$this->assertStringContainsString( '<img src="https://example.org/filled.png" alt="Filled alt"/>', $resolved );
+		$this->assertStringContainsString( '</figure>', $resolved );
+	}
+
+	/**
+	 * A caption that has something in it is still written in place.
+	 */
+	public function test_caption_with_a_value_is_written_into_the_figcaption() {
+		$slug = $this->register_pattern(
+			'test/photo',
+			'<!-- wp:image {"metadata":{"name":"photo","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<figure class="wp-block-image"><img src="https://example.org/default.png" alt="Default alt"/>'
+			. '<figcaption class="wp-element-caption">Default caption</figcaption></figure>'
+			. '<!-- /wp:image -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $slug, array( 'photo' => array( 'caption' => 'Filled caption' ) ) )
+		);
+
+		$this->assertStringContainsString( '<figcaption class="wp-element-caption">Filled caption</figcaption>', $resolved );
+		$this->assertStringNotContainsString( 'Default caption', $resolved );
+	}
+
+	/**
+	 * An image with no caption to begin with is left exactly as it was.
+	 */
+	public function test_empty_caption_on_an_image_without_one_changes_nothing() {
+		$slug = $this->register_pattern(
+			'test/photo',
+			'<!-- wp:image {"metadata":{"name":"photo","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<figure class="wp-block-image"><img src="https://example.org/default.png" alt="Default alt"/></figure>'
+			. '<!-- /wp:image -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block(
+				$slug,
+				array(
+					'photo' => array(
+						'alt'     => 'Filled alt',
+						'caption' => '',
+					),
+				)
+			)
+		);
+
+		$this->assertStringContainsString( '<figure class="wp-block-image">', $resolved );
+		$this->assertStringContainsString( 'alt="Filled alt"', $resolved );
+		$this->assertStringNotContainsString( 'figcaption', $resolved );
+	}
+
+	/**
+	 * An element the block would have saved empty is emptied, not removed.
+	 *
+	 * `core/button` writes its `a` whether or not there is a label in it, so
+	 * the rule that removes an empty caption must not reach this far. Losing
+	 * the anchor would take the block's link, its classes and its styling with
+	 * it.
+	 */
+	public function test_empty_button_text_keeps_the_anchor() {
+		$slug = $this->register_pattern(
+			'test/cta',
+			'<!-- wp:button {"metadata":{"name":"cta","bindings":{"text":{"source":"core/pattern-overrides"}}}} -->'
+			. '<div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="https://example.org/old">Old label</a></div>'
+			. '<!-- /wp:button -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $slug, array( 'cta' => array( 'text' => '' ) ) )
+		);
+
+		$this->assertStringContainsString(
+			'<a class="wp-block-button__link wp-element-button" href="https://example.org/old"></a>',
+			$resolved
+		);
+		$this->assertStringNotContainsString( 'Old label', $resolved );
+	}
+
+	/**
+	 * The same, for a paragraph, whose `p` is the block itself.
+	 */
+	public function test_empty_paragraph_content_keeps_the_paragraph() {
+		$slug = $this->register_pattern(
+			'test/hero',
+			'<!-- wp:paragraph {"metadata":{"name":"lede","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<p>Default lede</p>'
+			. '<!-- /wp:paragraph -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $slug, array( 'lede' => array( 'content' => '' ) ) )
+		);
+
+		$this->assertStringContainsString( '<p></p>', $resolved );
+		$this->assertStringNotContainsString( 'Default lede', $resolved );
+	}
 }
