@@ -22,6 +22,24 @@ use WP_HTML_Tag_Processor;
 class Block_Markup {
 
 	/**
+	 * Elements a block's `save()` leaves out rather than writing empty.
+	 *
+	 * Writing an empty value into an element-sourced attribute has to end up
+	 * with the markup that block would have saved, and for most of them that is
+	 * the element with nothing inside it: `core/paragraph` writes `<p></p>`,
+	 * `core/button` an empty `<a>`, `core/code` an empty `<code>`. These two are
+	 * the exceptions. Core wraps them in an emptiness check, so an empty value
+	 * means no element at all, and an empty one left behind is markup no version
+	 * of the block would write — which the editor reports as invalid content the
+	 * moment the surrounding bindings are resolved away.
+	 *
+	 * `figcaption` covers `core/image`, `core/audio` and `core/video`; `cite`
+	 * covers `core/quote` and `core/pullquote`. Of those only `core/image`'s
+	 * caption can be bound today, which is how this was found.
+	 */
+	const OPTIONAL_ELEMENTS = array( 'figcaption', 'cite' );
+
+	/**
 	 * Sets an attribute's value on a parsed block.
 	 *
 	 * Returns the block unchanged when the value cannot be written, which keeps
@@ -66,11 +84,13 @@ class Block_Markup {
 		switch ( $definition['source'] ) {
 			case 'html':
 			case 'rich-text':
-				$updated = Inner_HTML_Processor::replace_inner_html(
-					$markup,
-					$selectors,
-					wp_kses_post( (string) $value )
-				);
+				$updated = '' === (string) $value && self::elements_are_optional( $selectors )
+					? Inner_HTML_Processor::remove_element( $markup, $selectors )
+					: Inner_HTML_Processor::replace_inner_html(
+						$markup,
+						$selectors,
+						wp_kses_post( (string) $value )
+					);
 				break;
 
 			case 'attribute':
@@ -152,6 +172,31 @@ class Block_Markup {
 		}
 
 		return $tags;
+	}
+
+	/**
+	 * Whether an empty value means removing these elements rather than emptying them.
+	 *
+	 * Every selector has to be one of the optional elements. A block whose
+	 * attribute can land in more than one place — `core/button`'s text, in an
+	 * `a` or a `button` — is structural in both, and nothing in
+	 * `OPTIONAL_ELEMENTS` shares a selector list with an element like that.
+	 *
+	 * @param string[] $selectors Tag names from the attribute's schema.
+	 * @return bool Whether all of them are elements `save()` omits when empty.
+	 */
+	private static function elements_are_optional( array $selectors ): bool {
+		if ( empty( $selectors ) ) {
+			return false;
+		}
+
+		foreach ( $selectors as $tag ) {
+			if ( ! in_array( strtolower( $tag ), self::OPTIONAL_ELEMENTS, true ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
